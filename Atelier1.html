@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atelier 1</title>
+</head>
+
+<body>
+    <div id="graphContainer" style="margin:auto;"></div>
+    <script>
+        const svgns = "http://www.w3.org/2000/svg";
+        let viewPortMaxUnitX = 1000;
+        let viewPortMaxUnitY = 1000;
+        let viewport = null;
+        let HauteurMax = 100;
+        let HauteurMin = 800;
+        let mois = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+        let ventes = [6500, 5550, 4200, 4525, 2500, 1500, 500, 1000, 1750, 2300, 3700, 3500];
+        init_UI();
+        function init_UI() {
+            insertViewPort("graphContainer");
+            BackgroundDiag();
+        }
+        function insertViewPort(containerId) {
+            viewport = document.createElementNS(svgns, "svg");
+            viewport.setAttribute("id", "viewport");
+            viewport.setAttribute("viewBox", "0 0 " + viewPortMaxUnitX + " " + viewPortMaxUnitY);
+            document.getElementById(containerId).appendChild(viewport);
+        }
+        function Diagramme() {
+            viewport.appendChild(line(100, 20, 400, 200, 'green', 15));
+            viewport.appendChild(line(20, 20, 400, 150, 'red', 15));
+            viewport.appendChild(line(150, 20, 400, 100, 'blue', 15));
+            viewport.appendChild(line(100, 20, 400, 50, 'orange', 15));
+        }
+
+        function BackgroundDiag() {
+            //viewport.appendChild(line(200, 100, 700, 100, 'grey', 3));
+            viewport.appendChild(text(450, 50, 'Ventes 2022', 0, 2));
+            viewport.appendChild(text(20, 100, '$ 7000', 0, 1.5));
+
+            GreyLine();
+            BlackLine();
+            AfficherPrix();
+            AfficherMois(mois);
+            AfficherBandes(ventes);
+            AfficherMontant(ventes);
+        }
+
+        function BlackLine() {
+            for (let i = 0; i <= 70; i += 10) {
+                viewport.appendChild(line(100, HauteurMax + (i * 10), 850, HauteurMax + (i * 10), 'black', 3));
+
+            }
+        }
+
+        function GreyLine() {
+            for (let i = 1; i < 70; i++) {
+                viewport.appendChild(line(100, HauteurMax + (i * 10), 850, HauteurMax + (i * 10), 'lightgrey'));
+            }
+        }
+
+        function AfficherPrix() {
+            for (let i = 0; i <= 70; i += 10) {
+                if (i == 70) {
+                    viewport.appendChild(text(55, HauteurMax + (i * 10), '$ ' + (70 - i), 0, 1.5));
+                }
+                else {
+                    viewport.appendChild(text(20, HauteurMax + (i * 10), '$ ' + (70 - i) + '00', 0, 1.5));
+                }
+            }
+
+        }
+
+        function AfficherMois(mois) {
+            // Ici, selon le DevTools de Chrome, la hauteur la plus basse est de
+            // 800
+            // La ligne noir débute en x à la position
+            // 100
+            for (let i = 1; i <= 12; i++) {
+                viewport.appendChild(text(60 + (60 * i) /*Ici la première position est de 120
+                                                            et la dernière position est de 780*/, 850, mois[i - 1], 45, 1.5));
+            }
+        }
+
+        function AfficherBandes(ventes) {
+            for (let i = 1; i <= 12; i++) {
+                if (ventes[i - 1] <= 1000) {
+                    viewport.appendChild(rect(50 + (60 * i), 800 - (ventes[i - 1] / 10), 50, (ventes[i - 1] / 10), 'red'));
+                } else if (ventes[i - 1] <= 3000) {
+                    viewport.appendChild(rect(50 + (60 * i), 800 - (ventes[i - 1] / 10), 50, (ventes[i - 1] / 10), 'orange'));
+                } else if (ventes[i - 1] <= 4500) {
+                    viewport.appendChild(rect(50 + (60 * i), 800 - (ventes[i - 1] / 10), 50, (ventes[i - 1] / 10), 'yellow'));
+                } else {
+                    viewport.appendChild(rect(50 + (60 * i), 800 - (ventes[i - 1] / 10), 50, (ventes[i - 1] / 10), 'green'));
+                }
+            }
+        }
+
+        function AfficherMontant(ventes) {
+            /*
+            viewport.appendChild(text(110, 140, '$' + 6500, 0, 1));
+            viewport.appendChild(text(170, 235, '$' + 2450, 0, 1));*/
+            for (let i = 1; i <= 12; i++) {
+                viewport.appendChild(text(55 + (60 * i), 800 - (ventes[i - 1] / 10) - 10, '$' + ventes[i - 1], 0, 1))
+            }
+        }
+
+        function line(x1, y1, x2, y2, stroke = "black", strokeWidth = 1) {
+            let line = document.createElementNS(svgns, "line");
+            line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+            line.setAttribute("stroke", stroke);
+            line.setAttribute("stroke-width", strokeWidth);
+            return line;
+        }
+
+        function rect(x, y, width, height, fill = "white", stroke = "black", strokeWidth = 1) {
+            let rect = document.createElementNS(svgns, "rect");
+            rect.setAttribute("x", x); rect.setAttribute("y", y);
+            rect.setAttribute("width", width); rect.setAttribute("height", height);
+            rect.setAttribute("fill", fill); rect.setAttribute("stroke", stroke);
+            rect.setAttribute("stroke-width", strokeWidth);
+            return rect;
+        }
+        function text(x, y, content, angle = 45, size = "1", fill = "black") {
+            let text = document.createElementNS(svgns, "text");
+            text.setAttribute("x", x); text.setAttribute("y", y);
+            text.setAttribute("transform", `rotate(${angle},${x},${y})`);
+            text.setAttribute("font-size", size + "em");
+            text.setAttribute("fill", fill);
+            text.innerHTML = content;
+            return text;
+        }
+
+    </script>
+
+</body>
+
+</html>

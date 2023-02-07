@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <style>
+            .controlsPane {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-family: sans-serif;
+                background: #f5f6f7;
+                padding: 10px;
+                border-bottom: black solid;
+                -webkit-user-select: none;
+                /* Safari */
+                -ms-user-select: none;
+                /* IE 10 and IE 11 */
+                user-select: none;
+                /* Standard syntax */
+            }
+
+            .controlsPane button {
+                width: 40px;
+                height: 35px;
+                padding: 2px !important;
+            }
+
+            .controlsPane img {
+                height: 25px;
+            }
+
+            .controlsPane input {
+                height: 35px;
+                padding: auto;
+            }
+
+            .controlsPane input[type=checkbox] {
+                height: 20px;
+                padding: auto;
+            }
+
+            .controlsPane input[type=number] {
+                height: 28px;
+                width: 32px;
+                padding: auto;
+            }
+
+            .draggable {
+                cursor: grab;
+            }
+
+            #svgCanvas {
+                cursor: crosshair;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            #canvasContainer {
+                overflow: scroll;
+                width: 1000px;
+                height: 1000px;
+                border: 1px solid rgb(0, 0, 0);
+            }
+
+            .handlesLink {
+                stroke: gray;
+                stroke-width: 1;
+            }
+
+            .handle {
+                stroke: black;
+                fill: white;
+            }
+
+            .closingAnchor {
+                display: none;
+            }
+
+            .hidden {
+                display: none !important;
+            }
+
+            .anchor {
+                stroke: gray;
+                fill: gray;
+            }
+
+            .selected {
+                display: block;
+            }
+
+            .unselected {
+                display: none;
+            }
+
+            .grid {
+                stroke: none;
+                fill: black;
+            }
+
+            .selectRect {
+                fill: none;
+                stroke: gray;
+            }
+
+            path {
+                stroke-linecap: "round";
+            }
+        </style>
+
+    </head>
+
+    <body>
+        <div class="controlsPane">
+
+            <button id="line" onclick="shapeType = 'line'; createMode = true">
+                <img src="images/line.png" alt="">
+            </button>
+            <button id="rectangle" onclick="shapeType = 'rect'; createMode = true">
+                <img src="images/rect.png" alt="">
+            </button>
+            <button id="ellipse" onclick="shapeType = 'ellipse'; createMode = true">
+                <img src="images/ellipse.png" alt="">
+            </button>
+            <button id="polygone" onclick="shapeType = 'line'; createMode = true">
+                <img src="images/poly.png" alt="">
+            </button>
+            <img src="images/pen.png" alt="" id="applyStrokeColor"> <input type="color" id="stroke" value="#000000">
+            <img src="images/fill.png" alt="" id="applyFillColor"> <input type="color" id="fill" value="#ffffff">
+            <img src="images/width.png" alt="" id="applyStrokeWidth"> <input type="number" id="width" value="1">
+        </div>
+
+        <svg id="svgCanvas" width="1880px" height="1000px" viewbox="0 0 1880 1000">
+            <g id="svgGroup" class="draggable"></g>
+        </svg>
+        <script defer>
+            const svgns = "http://www.w3.org/2000/svg";
+            const handleSize = 10;
+            let currentPathId = 0;
+            const maxUndo = 25;
+            let creatingPath = false;
+
+            document.addEventListener('DOMContentLoaded', () => {
+                svgViewport = document.getElementById("svgCanvas");
+                svgViewport.addEventListener("pointerdown", mouseDown);
+                svgViewport.addEventListener("pointermove", mouseMove);
+                svgViewport.addEventListener("pointerup", mouseUp);
+                document.addEventListener("contextmenu", (e) => { e.preventDefault() });
+                svgViewport.addEventListener("contextmenu", (e) => { e.preventDefault() });
+                document.addEventListener("keydown", keydown);
+                document.addEventListener("keyup", keyup);
+                document.getElementById('stroke').addEventListener("change", applyStroke);
+                document.getElementById('fill').addEventListener("change", applyFill);
+                document.getElementById('width').addEventListener("change", applyWidth);
+                document.getElementById('applyStrokeColor').addEventListener("click", applyStroke);
+                document.getElementById('applyFillColor').addEventListener("click", applyFill);
+                document.getElementById('applyStrokeWidth').addEventListener("click", applyWidth);
+
+                document.getElementById('line').addEventListener("click", createLine);
+                document.getElementById('rectangle').addEventListener("click", createRectangle);
+                document.getElementById('ellipse').addEventListener("click", createEllipse);
+                document.getElementById('polygone').addEventListener("click", createPolygone);
+
+            });
+
+            function applyStroke() {
+                Path.applyStrokeColorToSelection(document.getElementById("stroke").value);
+            }
+            function applyFill() {
+                Path.applyFillColorToSelection(document.getElementById("fill").value);
+            }
+            function applyWidth() {
+                Path.applyStrokeWithToSelection(document.getElementById("width").value);
+            }
+            function addSVG(svgObject) {
+                document.getElementById("svgGroup").appendChild(svgObject);
+            }
+            function scale(point, center, s) {
+                return { x: (point.x - center.x) * s + center.x, y: (point.y - center.y) * s + center.y };
+            }
+            function rotate(point, center, angle) {
+                let a = angle / 180 * Math.PI;
+                let tp = {
+                    x: point.x - center.x,
+                    y: point.y - center.y
+                };
+                let rtp = {
+                    x: Math.cos(a) * tp.x + Math.sin(a) * tp.y,
+                    y: -Math.sin(a) * tp.x + Math.cos(a) * tp.y
+                };
+                return { x: rtp.x + center.x, y: rtp.y + center.y };
+            }
+            function AngleVectors(origine, v1, v2) {
+                let angleVect = 0;
+                let EPSILON = 0.01;
+                let u = { x: v1.x - origine.x, y: v1.y - origine.y };
+                let v = { x: v2.x - origine.x, y: v2.y - origine.y };
+                angleVect = -(Math.atan2(u.x, u.y) - Math.atan2(v.x, v.y)) * 180 / Math.PI;
+                if (Math.abs(v.x) < EPSILON)
+                    angleVect = -90;
+                if (angleVect < 0)
+                    angleVect = (90 + angleVect) + 270;
+                return angleVect;
+            }
+            function length(v1, v2) {
+                return Math.sqrt((v2.x - v1.x) * (v2.x - v1.x) + (v2.y - v1.y) * (v2.y - v1.y))
+            }
+            class Anchor {
+                constructor(path, pos, control = null) {
+                    this.path = path;
+                    this.index = this.path.anchors.length;
+                    this.path.anchors.push(this);
+                    this.pos = { ...pos };
+                    this.control = control ? { ...control } : { ...pos };
+                    this.controlActive = true;
+                    this.isClosingPath = false;
+                    this.addHandles();
+                    this.toggleControlActivation();
+                    this.update();
+                    this.addMouseDownEventToHandles();
+                    this.unselect();
+                }
+                archive() {
+                    return {
+                        pos: this.pos,
+                        control: this.control,
+                        active: this.controlActive,
+                        closing: this.isClosingPath
+                    }
+                }
+                static restore(path, archive) {
+                    let anchor = new Anchor(path, archive.pos, archive.control);
+                    anchor.setClosingPath(archive.closing);
+                    if (archive.active) anchor.toggleControlActivation();
+                    return anchor;
+                }
+                clone(path) {
+                    let anchor = new Anchor(path, this.pos, this.control);
+                    anchor.setClosingPath(this.isClosingPath);
+                    if (this.controlActive) anchor.toggleControlActivation();
+                    return anchor;
+                }
+                synchronizePathId() {
+                    this.anchorHandle.setAttribute("pathId", this.path.id);
+                    this.controlHandle.setAttribute("pathId", this.path.id);
+                    this.handlesLink.setAttribute("pathId", this.path.id);
+                }
+                toggleControlActivation() {
+                    if (this.controlActive) {
+                        this.controlHandle.classList.add('hidden');
+                        this.handlesLink.classList.add('hidden');
+                    }
+                    else {
+                        this.controlHandle.classList.remove('hidden');
+                        this.handlesLink.classList.remove('hidden');
+                    }
+                    this.controlActive = !this.controlActive;
+                    this.update();
+                }
+                addMouseDownEventToHandles() {
+                    this.anchorHandle.addEventListener("pointerdown", Path.handleMouseDown);
+                    this.controlHandle.addEventListener("pointerdown", Path.handleMouseDown);
+                }
+                addHandles() {
+                    this.addLink();
+                    this.addAnchor();
+                    this.addControl();
+                    this.update();
+                }
+                addLink() {
+                    this.handlesLink = document.createElementNS(svgns, "line");
+                    this.handlesLink.setAttribute("pathId", this.path.id);
+                    this.handlesLink.classList.add("handlesLink");
+                    addSVG(this.handlesLink);
+                }
+                addAnchor() {
+                    this.anchorHandle = document.createElementNS(svgns, "rect");
+                    this.anchorHandle.setAttribute("width", handleSize);
+                    this.anchorHandle.setAttribute("height", handleSize);
+                    this.anchorHandle.setAttribute("pathId", this.path.id);
+                    this.anchorHandle.setAttribute("index", this.index);
+                    this.anchorHandle.setAttribute("type", 'anchor');
+                    this.anchorHandle.classList.add("handle", "anchor");
+                    addSVG(this.anchorHandle);
+                }
+                addControl() {
+                    this.controlHandle = document.createElementNS(svgns, "ellipse");
+                    this.controlHandle.setAttribute("rx", handleSize / 2);
+                    this.controlHandle.setAttribute("ry", handleSize / 2);
+                    this.controlHandle.setAttribute("pathId", this.path.id);
+                    this.controlHandle.setAttribute("index", this.index);
+                    this.controlHandle.setAttribute("type", 'control');
+                    this.controlHandle.classList.add("handle");
+                    addSVG(this.controlHandle);
+                }
+                removeHandles() {
+                    this.controlHandle.remove();
+                    this.anchorHandle.remove();
+                    this.handlesLink.remove();
+                }
+                update() {
+                    this.updateAnchor();
+                    this.updateControl();
+                    this.updateLink();
+                }
+                updateLink() {
+                    this.handlesLink.setAttribute("x1", this.pos.x);
+                    this.handlesLink.setAttribute("y1", this.pos.y);
+                    this.handlesLink.setAttribute("x2", this.control.x);
+                    this.handlesLink.setAttribute("y2", this.control.y);
+                }
+                updateAnchor(anchor, pos) {
+                    this.anchorHandle.setAttribute("x", this.pos.x - handleSize / 2);
+                    this.anchorHandle.setAttribute("y", this.pos.y - handleSize / 2);
+                }
+                updateControl() {
+                    this.controlHandle.setAttribute("cx", this.control.x);
+                    this.controlHandle.setAttribute("cy", this.control.y);
+                }
+                moveAnchor(deltax, deltay) {
+                    this.pos.x += deltax;
+                    this.pos.y += deltay;
+                    this.update();
+                }
+                moveControl(deltax, deltay) {
+                    this.control.x += deltax;
+                    this.control.y += deltay;
+                    this.update();
+                }
+                move(deltax, deltay) {
+                    this.moveAnchor(deltax, deltay);
+                    this.moveControl(deltax, deltay);
+                }
+                scale(center, factor) {
+                    this.pos = scale(this.pos, center, factor);
+                    this.control = scale(this.control, center, factor);
+                    this.update();
+                }
+                rotate(center, angle) {
+                    this.pos = rotate(this.pos, center, angle);
+                    this.control = rotate(this.control, center, angle);
+                    this.update();
+                }
+                setClosingPath(closing) {
+                    this.isClosingPath = closing;
+                    if (closing)
+                        this.anchorHandle.classList.add("closingAnchor");
+                    else
+                        this.anchorHandle.classList.remove("closingAnchor");
+                }
+                inRect(selectRect) {
+                    return (
+                        (this.pos.x >= selectRect.x1) &&
+                        (this.pos.y >= selectRect.y1) &&
+                        (this.pos.x <= selectRect.x2) &&
+                        (this.pos.y <= selectRect.y2)
+                    )
+                }
+                select() {
+                    if (!this.isClosingPath)
+                        this.anchorHandle.classList.add('selected');
+                    this.controlHandle.classList.add('selected');
+                    this.handlesLink.classList.add('selected');
+                    if (!this.isClosingPath)
+                        this.anchorHandle.classList.remove('unselected');
+                    this.controlHandle.classList.remove('unselected');
+                    this.handlesLink.classList.remove('unselected');
+                }
+                unselect() {
+                    if (!this.isClosingPath)
+                        this.anchorHandle.classList.remove('selected');
+
+                    this.controlHandle.classList.remove('selected');
+                    this.handlesLink.classList.remove('selected');
+
+                    this.anchorHandle.classList.add('unselected');
+
+                    this.controlHandle.classList.add('unselected');
+                    this.handlesLink.classList.add('unselected');
+                }
+            }
+
+            class Path {
+                static paths = [];
+                static currentPath = null;
+                static currentPathHandle = null;
+                static undo = [];
+                static redo = [];
+
+                constructor() {
+                    this.anchors = [];
+                    this.selected = false;
+                    this.closed = true;
+                    this.strokeWidth = 1;
+                    this.strokeColor = 'black';
+                    this.fillColor = 'white';
+                    Path.addPath(this);
+                    this.initNode();
+                }
+                archive() {
+                    let anchorsArchive = [];
+                    for (let anchor of this.anchors) {
+                        anchorsArchive.push(anchor.archive());
+                    }
+                    return {
+                        anchors: anchorsArchive,
+                        strokeWidth: this.strokeWidth,
+                        strokeColor: this.strokeColor,
+                        fillColor: this.fillColor,
+                        closed: this.closed,
+                        selected: this.selected
+                    }
+                }
+
+                static archivePaths() {
+                    let pathsArchive = [];
+                    for (let path of Path.paths) {
+                        pathsArchive.push(path.archive());
+                    }
+                    return pathsArchive;
+                }
+
+                static deleteAll() {
+                    for (let path of Path.paths) {
+                        path.flushSvgNodes();
+                    }
+                    Path.paths.splice(0, Path.paths.length);
+                    Path.paths = [];
+                }
+                static restore(archives) {
+                    Path.deleteAll();
+                    for (let archive of archives) {
+                        let path = new Path();
+                        path.closed = archive.closed;
+                        path.strokeWidth = archive.strokeWidth;
+                        path.strokeColor = archive.strokeColor;
+                        path.fillColor = archive.fillColor;
+                        for (let anchor of archive.anchors) {
+                            Anchor.restore(path, anchor);
+                        }
+                        path.update();
+                        if (archive.selected)
+                            path.select();
+                    }
+                }
+                clone() {
+                    let path = new Path();
+                    path.closed = this.closed;
+                    path.strokeColor = this.strokeColor;
+                    path.strokeWidth = this.strokeWidth;
+                    path.fillColor = this.fillColor;
+                    for (let anchor of this.anchors) {
+                        anchor.clone(path);
+                    }
+                    path.update();
+                    return path;
+                }
+                static pushUndo() {
+                    if (Path.undo.length == maxUndo)
+                        Path.undo.splice(0, 1);
+                    Path.undo.push(Path.archivePaths());
+                    console.log('undo:', Path.undo.length);
+
+                }
+                static pushRedo() {
+                    if (Path.redo.length == maxUndo)
+                        Path.redo.splice(0, 1);
+                    Path.redo.push(Path.archivePaths());
+                    console.log('redo:', Path.redo.length);
+
+                }
+                static pullUndo() {
+                    if (Path.undo.length > 0) {
+                        Path.pushRedo();
+                        Path.deleteAll();
+                        let last = Path.undo.length - 1;
+                        let archives = Path.undo[last];
+                        Path.undo.splice(last, 1);
+                        Path.restore(archives);
+                    }
+                }
+
+                static pullRedo() {
+                    if (Path.redo.length > 0) {
+                        Path.pushUndo();
+                        Path.deleteAll();
+                        let last = Path.redo.length - 1;
+                        let archives = Path.redo[last];
+                        Path.redo.splice(last, 1);
+                        Path.restore(archives);
+                    }
+                }
+                static addPath(path) {
+                    path.id = Path.paths.length;
+                    Path.paths.push(path);
+                }
+
+                static synchronizeId() {
+                    let id = 0;
+                    for (let path of Path.paths) {
+                        path.id = id++;
+                        path.svgNode.setAttribute("pathId", path.id);
+                        for (let anchor of path.anchors)
+                            anchor.synchronizePathId();
+                    }
+                }
+                flushSvgNodes() {
+                    this.svgNode.remove();
+                    for (let anchor of this.anchors) {
+                        anchor.removeHandles();
+                    }
+                }
+                static deleteSelected() {
+                    Path.pushUndo();
+                    let oneDeleted = false;
+                    do {
+                        oneDeleted = false;
+                        for (let path of Path.paths) {
+                            if (path.selected) {
+                                path.flushSvgNodes();
+                                Path.paths.splice(path.id, 1);
+                                oneDeleted = true;
+                                break;
+                            }
+                        }
+                        Path.synchronizeId();
+                    } while (oneDeleted);
+                    Path.currentPath = null;
+
+                }
+                initNode() {
+                    this.svgNode = document.createElementNS(svgns, "path");
+                    this.svgNode.setAttribute("pathId", this.id);
+                    this.svgNode.addEventListener("pointerdown", Path.pathMouseDown);
+                    addSVG(this.svgNode);
+                }
+                static equalVect(v1, v2) {
+                    let distance = length(v1, v2);
+                    return distance < 5;
+                }
+
+                addAnchor(x, y, cx = null, cy = null) {
+                    let pos = { x, y };
+                    let control = (cx && cy ? { x: cx, y: cy } : { x, y });
+                    let anchor = null;
+                    let activate = !Path.equalVect(pos, control);
+                    if (this.anchors.length == 0) {
+                        anchor = new Anchor(this, { ...pos }, { ...control });
+                        if (activate) {
+                            anchor.toggleControlActivation();
+                        }
+                    } else {
+                        let endControl = { x: pos.x - (control.x - pos.x), y: pos.y - (control.y - pos.y) };
+                        let endAnchor = new Anchor(this, { ...pos }, { ...endControl });
+                        anchor = endAnchor;
+
+                        if (activate)
+                            anchor.toggleControlActivation();
+
+                        if (this.closed && (Path.equalVect(endAnchor.pos, this.anchors[0].pos))) {
+                            if (activate && !this.anchors[0].controlActive)
+                                this.anchors[0].toggleControlActivation();
+                            endAnchor.pos = { ...this.anchors[0].pos };
+                            endAnchor.setClosingPath(true);
+                            console.log('closed')
+                        } else {
+                            anchor = new Anchor(this, { ...pos }, { ...control });
+                            if (activate)
+                                anchor.toggleControlActivation();
+                        }
+                    }
+                    this.update();
+                    return anchor;
+                }
+                activateControls() {
+                    let index = 0;
+                    while (index < (this.anchors.length - 1)) {
+                        let control = { ...this.anchors[index].control };
+
+                        this.doToogleControl(this.anchors[index]);
+                        this.anchors[index].control = { ...this.anchors[index].pos };
+                        this.anchors[index].update();
+                        this.moveHandle(this.anchors[index], control.x, control.y);
+                        index += 2;
+                    }
+                    this.update();
+                }
+
+                anchorData(anchor) {
+                    let anchorData = "";
+                    if (anchor.index == 0) {
+                        anchorData = `M ${anchor.pos.x}, ${anchor.pos.y}`;
+                    } else {
+                        let prevAnchor = this.anchors[anchor.index - 1];
+                        let preControl = (prevAnchor.controlActive ? prevAnchor.control : prevAnchor.pos);
+                        let ancControl = (anchor.controlActive ? { ...anchor.control } : { ...anchor.pos });
+                        if ((prevAnchor.pos.x != anchor.pos.x) || (prevAnchor.pos.y != anchor.pos.y))
+                            anchorData += ` C ${preControl.x},${preControl.y} ${ancControl.x},${ancControl.y} ${anchor.pos.x},${anchor.pos.y}`;
+                    }
+                    return anchorData;
+                }
+                update() {
+                    let pathData = "";
+                    for (let anchor of this.anchors) {
+                        pathData += this.anchorData(anchor);
+                    }
+                    this.svgNode.setAttribute("d", pathData);
+                    this.svgNode.setAttribute("stroke-width", this.strokeWidth);
+                    this.svgNode.setAttribute("fill", this.fillColor);
+                    this.svgNode.setAttribute("stroke", this.strokeColor);
+                    this.svgNode.setAttribute("stroke-linecap", "round");
+                    this.svgNode.setAttribute("stroke-linejoin", "round");
+                }
+                static applyStrokeWithToSelection(width) {
+                    for (let path of Path.paths) {
+                        if (path.selected) {
+                            path.strokeWidth = width;
+                            path.update();
+                        }
+                    }
+                }
+                static applyStrokeColorToSelection(color) {
+                    for (let path of Path.paths) {
+                        if (path.selected) {
+                            path.strokeColor = color;
+                            path.update();
+                        }
+                    }
+                }
+                static applyFillColorToSelection(color) {
+                    for (let path of Path.paths) {
+                        if (path.selected) {
+                            path.fillColor = color;
+                            path.update();
+                        }
+                    }
+                }
+                doToogleControl(anchor) {
+                    if (anchor.index > 0) {
+                        let prevAnchor = this.anchors[anchor.index - 1];
+                        if (!anchor.controlActive && !prevAnchor.controlActive) {
+                            anchor.toggleControlActivation();
+                            prevAnchor.toggleControlActivation();
+                        } else {
+                            if (anchor.controlActive && prevAnchor.controlActive) {
+                                prevAnchor.toggleControlActivation();
+                            } else {
+                                if (anchor.controlActive && !prevAnchor.controlActive) {
+                                    anchor.toggleControlActivation();
+                                    prevAnchor.toggleControlActivation();
+                                } else {
+                                    if (!anchor.controlActive && prevAnchor.controlActive) {
+                                        prevAnchor.toggleControlActivation();
+
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        if (this.closed && (this.anchors.length > 3)) {
+                            let prevAnchor = this.anchors[this.anchors.length - 1];
+                            if (!anchor.controlActive && !prevAnchor.controlActive) {
+                                anchor.toggleControlActivation();
+                                prevAnchor.toggleControlActivation();
+                            } else {
+                                if (anchor.controlActive && prevAnchor.controlActive) {
+                                    prevAnchor.toggleControlActivation();
+                                } else {
+                                    if (anchor.controlActive && !prevAnchor.controlActive) {
+                                        anchor.toggleControlActivation();
+                                        prevAnchor.toggleControlActivation();
+                                    } else {
+                                        if (!anchor.controlActive && prevAnchor.controlActive) {
+                                            prevAnchor.toggleControlActivation();
+
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            anchor.toggleControlActivation();
+                        }
+                    }
+                    this.update();
+                }
+                toggleControl(handle) {
+                    //Path.pushUndo();
+
+                    if (handle.type == 'anchor') {
+                        this.doToogleControl(this.anchors[handle.index]);
+                    }
+                }
+                broken(c1, a, c2) {
+                    let dx = Math.abs((c1.x - a.x) - (a.x - c2.x));
+                    let dy = Math.abs((c1.y - a.y) - (a.y - c2.y));
+                    let broked = (dx + dy) > 5;
+                    return broked;
+                }
+                moveHandle(handle, deltax, deltay, brake = false) {
+                    // Path.pushUndo();
+                    let anchor = this.anchors[handle.index];
+                    switch (handle.type) {
+                        case 'anchor':
+                            anchor.moveAnchor(deltax, deltay);
+                            anchor.moveControl(deltax, deltay);
+                            if (anchor.index > 0) {
+                                let prevAnchor = this.anchors[anchor.index - 1];
+                                prevAnchor.moveAnchor(deltax, deltay);
+                                prevAnchor.moveControl(deltax, deltay);
+                            } else {
+                                if (this.closed) {
+                                    this.anchors[this.anchors.length - 1].moveAnchor(deltax, deltay);
+                                    this.anchors[this.anchors.length - 1].moveControl(deltax, deltay);
+                                }
+                            }
+                            break;
+                        case 'control':
+                            let control = { ...anchor.control };
+                            anchor.moveControl(deltax, deltay);
+                            if (!brake) {
+                                let twin = null;
+                                if (anchor.index > 0) {
+                                    let prevAnchor = this.anchors[anchor.index - 1];
+                                    if ((prevAnchor.pos.x == anchor.pos.x) && (prevAnchor.pos.y == anchor.pos.y))
+                                        twin = prevAnchor;
+                                }
+                                let length = this.anchors.length;
+                                if ((anchor.index + 1) < this.anchors.length) {
+                                    let nextAnchor = this.anchors[anchor.index + 1];
+                                    if ((nextAnchor.pos.x == anchor.pos.x) && (nextAnchor.pos.y == anchor.pos.y))
+                                        twin = nextAnchor;
+                                }
+
+                                if (this.closed && (anchor.index == 0)) {
+                                    twin = this.anchors[this.anchors.length - 1];
+                                }
+
+                                if (this.closed && (anchor.index == (this.anchors.length - 1))) {
+                                    twin = this.anchors[0];
+                                }
+
+                                if (twin && twin.controlActive) {
+                                    if (!this.broken(twin.control, anchor.pos, control))
+                                        twin.moveControl(-deltax, -deltay);
+                                }
+                            }
+                            break;
+                        default: break;
+                    }
+                    this.update();
+                }
+                move(deltax, deltay) {
+                    for (let anchor of this.anchors) {
+                        anchor.move(deltax, deltay);
+                    }
+                    this.update();
+                }
+
+                calcCenter() {
+                    let sx = 0;
+                    let sy = 0;
+                    let n = 0;
+                    for (let i = 0; i < this.anchors.length; i += 2) {
+                        sx += this.anchors[i].pos.x;
+                        sy += this.anchors[i].pos.y;
+                        n++;
+                    }
+                    if (n > 0)
+                        return { x: sx / n, y: sy / n };
+                    return { x: 0, y: 0 };
+                }
+                updateCenter() {
+                    this.center = this.calcCenter();
+                }
+                select() {
+                    this.selected = true;
+                    this.updateCenter();
+                    for (let anchor of this.anchors) {
+                        anchor.select();
+                    }
+                }
+                unselect() {
+                    this.selected = false;
+                    for (let anchor of this.anchors) {
+                        anchor.unselect();
+                    }
+                }
+                scale(center, factor) {
+                    for (let anchor of this.anchors) {
+                        anchor.scale(center, factor);
+                    }
+                    this.update();
+                }
+                rotate(center, angle) {
+                    for (let anchor of this.anchors) {
+                        anchor.rotate(center, angle);
+                    }
+                    this.update();
+                }
+
+                static cloneSelected() {
+                    Path.pushUndo();
+                    let pathsCount = Path.paths.length;
+                    for (let i = 0; i < pathsCount; i++) {
+                        let path = Path.paths[i];
+                        if (path.selected) {
+                            path.unselect();
+                            let clone = path.clone();
+                            clone.select();
+                        }
+                    }
+                }
+                static moveSelected(deltax, deltay) {
+                    //Path.pushUndo();
+                    for (let path of Path.paths)
+                        if (path.selected)
+                            path.move(deltax, deltay);
+                }
+                static rotateSelected(angle) {
+                    //Path.pushUndo();
+                    for (let path of Path.paths)
+                        if (path.selected) {
+                            path.rotate(path.center, angle);
+                        }
+                }
+                static scaleSelected(scale) {
+                    //Path.pushUndo();
+                    for (let path of Path.paths)
+                        if (path.selected) {
+                            path.scale(path.center, scale);
+                        }
+                }
+                static unselectAll() {
+                    for (let path of this.paths) {
+                        path.unselect();
+                    }
+                }
+                static selectAll() {
+                    for (let path of this.paths) {
+                        path.select();
+                    }
+                }
+                static selectByRect(selectRect) {
+                    Path.unselectAll();
+                    for (let path of Path.paths) {
+                        for (let anchor of path.anchors) {
+                            if (anchor.inRect(selectRect)) {
+                                path.select();
+                                break;
+                            }
+                        }
+                    }
+                }
+                static handleMouseDown(e) {
+                    let handle = e.target;
+                    let pathId = parseInt(handle.getAttribute('pathId'));
+                    let handleIndex = handle.getAttribute('index');
+                    let handleType = handle.getAttribute('type');
+
+                    Path.currentPath = Path.paths[pathId];
+                    Path.currentPathHandle = {
+                        index: parseInt(handleIndex),
+                        type: handleType,
+                    }
+                    // console.log(e.which)
+                    if (e.ctrlKey || e.which == 3 /* rigth-clic*/) {
+                        if (e.which) e.preventDefault();
+                        Path.currentPath.toggleControl(Path.currentPathHandle);
+                        Path.currentPathHandle.type = 'control';
+                    }
+                }
+                static pathMouseDown(e) {
+                    let pathIndex = e.target.getAttribute('pathId');
+
+                    Path.currentPath = Path.paths[pathIndex];
+                    if (!e.shiftKey) {
+                        if (!Path.currentPath.selected) {
+                            Path.unselectAll();
+                            Path.currentPath.select();
+                        }
+                    }
+                    else {
+                        if (Path.currentPath.selected)
+                            Path.currentPath.unselect();
+                        else
+                            Path.currentPath.select();
+                    }
+                    if (Path.currentPath.selected) {
+                        if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+                            Path.cloneSelected();
+                        }
+                    }
+                }
+            }
+
+            function createRectangle() {
+                Path.unselectAll();
+                let path = new Path();
+                path.closed = true;
+                path.addAnchor(100, 100);
+                path.addAnchor(300, 100);
+                path.addAnchor(300, 300);
+                path.addAnchor(100, 300);
+                path.addAnchor(100, 100);
+                path.select();
+            }
+
+            function dumpPath(path) {
+                for (let anchor of path.anchors) {
+                    console.log(anchor.index, anchor.controlActive, anchor.pos, anchor.control);
+                }
+            }
+
+            const circleBezier = 0.552284749831;
+
+            function createEllipse() {
+                Path.unselectAll();
+                let path = new Path();
+                path.closed = true;
+                let t = 100 * circleBezier;
+                path.addAnchor(200, 100, 200 + t, 100);
+                path.addAnchor(300, 200, 300, 200 + t);
+                path.addAnchor(200, 300, 200 - t, 300);
+                path.addAnchor(100, 200, 100, 200 - t);
+                path.addAnchor(200, 100, 200 + t, 100);
+
+                dumpPath(path)
+                path.select();
+            }
+
+
+            function createLine() {
+                Path.unselectAll();
+                let path = new Path();
+                path.closed = false;
+                path.addAnchor(100, 100);
+                path.addAnchor(500, 100);
+                path.select();
+            }
+            function createPolygone() {
+                creatingPath = true;
+            }
+
+            function keydown(e) {
+                let ev = e || window.event;
+                let key = e.which || e.keyCode; //
+                console.log(key)
+                let delta = (!e.shiftKey ? grid : 1);
+                let angle = (!e.shiftKey ? 5 : 0.1);
+                let scale = (!e.shiftKey ? 0.1 : 0.001);
+                switch (key) {
+                    case 37: Path.moveSelected(-delta, 0); lastOp = 'move'; moveParam = { x: -delta, y: 0 }; break; /*left*/
+                    case 39: Path.moveSelected(delta, 0); lastOp = 'move'; moveParam = { x: delta, y: 0 }; break; /*right*/
+                    case 38: Path.moveSelected(0, -delta); lastOp = 'move'; moveParam = { x: 0, y: -delta }; break; /*up*/
+                    case 40: Path.moveSelected(0, delta); lastOp = 'move'; moveParam = { x: 0, y: delta }; break; /*down*/
+                    case 82: Path.rotateSelected(angle); lastOp = 'rotate'; rotateParam = angle; break; /* 'r' rotate counter clockwise*/
+                    case 84: Path.rotateSelected(-angle); lastOp = 'rotate'; rotateParam = -angle; break; /* 't' rotate clockwise*/
+                    case 83: Path.scaleSelected(1 + scale); lastOp = 'scale'; scaleParam = 1 + scale; break; /* 's' scale bigger*/
+                    case 68:
+                        if (e.ctrlKey) { // 'd' duplicate
+                            switch (lastOp) {
+                                case 'move':
+                                    Path.cloneSelected();
+                                    Path.moveSelected(moveParam.x, moveParam.y);
+                                    break;
+                                case 'rotate':
+                                    Path.cloneSelected();
+                                    Path.rotateSelected(rotateParam);
+                                    break;
+                                case 'scale':
+                                    Path.cloneSelected();
+                                    Path.scaleSelected(scaleParam);
+                                    break;
+                            }
+                        } else {
+                            Path.scaleSelected(1 - scale); scaleParam = 1 - scale; /* d' scale smaller*/
+                        }
+                        break;
+                    case 65: if (e.ctrlKey) Path.selectAll(); break;
+                    case 8:
+                    case 46: Path.deleteSelected(); break;
+                    case 71: snap = !snap; break; // 'g' toggle snap to grid
+                    case 89: if (e.ctrlKey) Path.pullRedo(); break;
+                    case 90: if (e.ctrlKey) Path.pullUndo(); break;
+                    case 78: creatingPath = true; break; //'n' new path
+                    case 69: creatingPath = false; break; // 'e' end path
+                    case 67: creatingPath = false; break; // 'c' end and close path
+
+                }
+                e.preventDefault();
+            }
+            function keyup(e) {
+                var key = e.keyCode || e.charCode;
+                controlDown = false;
+            }
+
+            let lastAngle = 0;
+            let lastScale = 1;
+            let lastMousePos = { x: 0, y: 0 };
+            let mouseDownPos = { x: 0, y: 0 };
+            let mouseIsDown = false;
+            let selectRect = null;
+            let constrainDir = -1;
+            let grid = 20;
+            let snap = true;
+            let lastOp = '';
+            let scaleParam = 1;
+            let rotateParam = 0;
+            let moveParam = { x: 0, y: 0 };
+            function installGrid() {
+                for (let x = 0; x < 1890; x += grid) {
+                    for (let y = 0; y < 1000; y += grid) {
+                        let dot = document.createElementNS(svgns, "ellipse");
+                        dot.setAttribute("cx", x);
+                        dot.setAttribute("cy", y);
+                        dot.setAttribute("rx", x);
+                        dot.setAttribute("rx", 0.5);
+                        dot.classList.add('grid');
+                        addSVG(dot);
+                    }
+                }
+            }
+            installGrid();
+            // makePath();
+
+            function roundToGrid(v) {
+                return Math.trunc((v + grid / 2) / grid) * grid;
+            }
+            function snapToGrid(p) {
+                if (snap)
+                    return { x: roundToGrid(p.x), y: roundToGrid(p.y) }
+                return p;
+            }
+
+            function makeSelectRect(mouseDownPos) {
+                console.log('makeSelectRect', mouseDownPos)
+                selectRect = document.createElementNS(svgns, "rect");
+                selectRect.setAttribute("x", mouseDownPos.x);
+                selectRect.setAttribute("y", mouseDownPos.y);
+                selectRect.classList.add("selectRect");
+                addSVG(selectRect);
+            }
+            function getselectRect() {
+                let x1 = parseFloat(selectRect.getAttribute('x'));
+                let y1 = parseFloat(selectRect.getAttribute('y'));
+                let x2 = x1 + parseFloat(selectRect.getAttribute('width'));
+                let y2 = y1 + parseFloat(selectRect.getAttribute('height'));
+                console.log(x1, y1, x2, y2)
+                return { x1, y1, x2, y2 }
+            }
+            function updateSelectRect(x, y, w, h) {
+                if (w < 0) {
+                    x = x + w;
+                    w = - w;
+                }
+                if (h < 0) {
+                    y = y + h;
+                    h = -h;
+                }
+                selectRect.setAttribute("x", x);
+                selectRect.setAttribute("y", y);
+                selectRect.setAttribute("width", w);
+                selectRect.setAttribute("height", h);
+            }
+
+            let lastAddedAnchor = null;
+            function mouseDown(e) {
+                mouseIsDown = true;
+                mouseDownPos = snapToGrid({ x: e.offsetX, y: e.offsetY });
+                lastMousePos = mouseDownPos;
+                currentTarget = e.target;
+                currentTarget.setPointerCapture(e.pointerId);
+                currentTarget.style.cursor = 'crosshair';
+                lastAddedAnchor = null;
+                if (creatingPath) {
+                    if (!Path.currentPath) {
+                        Path.unselectAll();
+                        Path.currentPath = new Path();
+                        Path.closed = false;
+                        Path.currentPath.select();
+                    }
+                    if (!Path.currentPathHandle) {
+                        lastAddedAnchor = Path.currentPath.addAnchor(mouseDownPos.x, mouseDownPos.y);
+                        lastAddedAnchor.select();
+                    } else {
+                        if (Path.currentPathHandle.index == 0) {
+                            let startAnchor = Path.currentPath.anchors[0];
+                            Path.currentPath.addAnchor(startAnchor.pos.x, startAnchor.pos.y);
+                            creatingPath = false;
+                            Path.currentPathHandle = null;
+                            Path.currentPath = null;
+                        }
+                    }
+                } else {
+                    if (!Path.currentPath) {
+                        Path.unselectAll();
+                        makeSelectRect({ x: e.offsetX, y: e.offsetY });
+                    } else Path.pushUndo();
+                }
+                scaleParam = 1;
+                rotateParam = 0;
+                moveParam = { x: 0, y: 0 };
+            }
+
+            function mouseMove(e) {
+                if (mouseIsDown) {
+                    let mp = snapToGrid({ x: e.offsetX, y: e.offsetY });
+                    let d = { x: mp.x - lastMousePos.x, y: mp.y - lastMousePos.y };
+                    let dir = { x: mp.x - mouseDownPos.x, y: mp.y - mouseDownPos.y };
+                    if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+                        if (constrainDir == -1)
+                            if (Math.abs(dir.x) > Math.abs(dir.y)) constrainDir = 1; else constrainDir = 2;
+                        switch (constrainDir) {
+                            case 1: d.y = 0; break;
+                            case 2: d.x = 0; break;
+                        }
+                    }
+                    if (Path.currentPathHandle) {
+                        if (creatingPath) {
+
+                        }
+                        Path.currentPath.moveHandle(Path.currentPathHandle, d.x, d.y, e.altKey)
+                    } else
+                        if (Path.currentPath) {
+                            if (e.shiftKey && e.ctrlKey) { // scale
+                                let mdp = { x: mouseDownPos.x - 100, y: mouseDownPos.y };
+                                let mmp = { x: e.offsetX, y: e.offsetY };
+                                let scale = roundToGrid(length(mdp, mmp)) / 100;
+                                Path.scaleSelected(1 / lastScale);
+                                Path.scaleSelected(scale);
+                                lastScale = scale;
+                                lastOp = "scale";
+                                scaleParam *= lastScale;
+                            } else
+                                if (e.altKey) { // rotate
+                                    Path.rotateSelected(-lastAngle);
+                                    let angle = AngleVectors({ x: mouseDownPos.x - 100, y: mouseDownPos.y }, { x: mouseDownPos.x, y: mouseDownPos.y }, { x: e.offsetX, y: e.offsetY });
+                                    if (snap) angle = Math.round(angle / 5) * 5;
+                                    Path.rotateSelected(angle);
+                                    lastAngle = angle;
+                                    rotateParam += lastAngle;
+                                    lastOp = 'rotate';
+                                } else { // move
+                                    Path.moveSelected(d.x, d.y);
+                                    moveParam = { x: moveParam.x + d.x, y: moveParam.y + d.y };
+                                    lastOp = 'move';
+                                }
+                        }
+                    if (selectRect) {
+                        updateSelectRect(mouseDownPos.x, mouseDownPos.y, e.offsetX - mouseDownPos.x, e.offsetY - mouseDownPos.y);
+                    }
+                    lastMousePos = mp;
+                }
+            }
+            function mouseUp(e) {
+                if (mouseIsDown) {
+                    if (currentTarget) {
+                        currentTarget.releasePointerCapture(e.pointerId);
+                        currentTarget.style.cursor = 'move';
+                    }
+                    currentTarget = null;
+                    Path.currentPathHandle = null;
+                    if (!creatingPath) {
+
+                        Path.currentPath = null;
+                    }
+                    lastAngle = 0;
+                    lastScale = 1;
+                    constrainDir = -1;
+                    if (selectRect) {
+                        Path.selectByRect(getselectRect());
+                        selectRect.remove();
+                    }
+                    selectRect = null;
+                    mouseIsDown = false;
+                }
+            }
+        </script>
+    </body>
+
+</html>

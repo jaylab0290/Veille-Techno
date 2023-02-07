@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Titan One">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fragment Mono">
+        <style>
+            .main {
+                max-width: 1400px;
+                margin: auto;
+            }
+
+            .defaultText {
+                fill: black;
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 3em;
+            }
+
+            .Titan_One {
+                font-family: Titan One;
+                stroke-width: 5px;
+                stroke: green;
+                fill: greenyellow;
+                font-size: 6em;
+            }
+
+            .clockNumber {
+                font-family: Titan One;
+                font-size: 4.2em;
+                text-anchor: middle;
+                transform: translate(5px, 25px);
+            }
+
+            .clockDate {
+                font-family: Fragment Mono;
+                fill: white;
+                font-size: 2.3em;
+            }
+
+            .clockTime {
+                font-family: Fragment Mono;
+                fill: white;
+                font-size: 2.3em;
+            }
+
+            .secondsTicks {
+                stroke: lightgray;
+            }
+
+            .minutesTicks {
+                stroke: gray;
+            }
+
+            #timeFrame,
+            #dateFrame {
+                fill: black;
+                stroke: black;
+                stroke-width: 1em;
+                stroke-linejoin: round;
+            }
+            #svgViewportContainer {
+                margin: auto;
+                max-width: 950px;
+                background: gray;
+            }
+        </style>
+
+    </head>
+
+    <body>
+        <div class="main">
+            <div id="svgViewportContainer"><svg id="svgViewport" viewbox="0 0 1000 1000"></svg></div>
+            
+        </div>
+
+        <script src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+        <script defer>
+            // Auteur: Nicolas Chourot
+
+            const svgns = "http://www.w3.org/2000/svg";
+            class SVG {
+                static createSVGElement(elementName, attributes) {
+                    return $(document.createElementNS(svgns, elementName)).attr(attributes);
+                }
+                static getViewBox(svgViewport) {
+                    let viewBoxText = document.getElementById(svgViewport).getAttribute("viewBox").split(" ");
+                    let viewBox = { left: 0, top: 0, right: 0, bottom: 0 }
+                    viewBox.left = parseFloat(viewBoxText[0]);
+                    viewBox.top = parseFloat(viewBoxText[1]);
+                    viewBox.right = parseFloat(viewBoxText[2]);
+                    viewBox.bottom = parseFloat(viewBoxText[3]);
+                    return viewBox;
+                }
+                static setId($elem, id) {
+                    $elem.attr('id', id);
+                }
+                static addClass($elem, className) {
+                    $elem.addClass(className);
+                }
+                static line(x1, y1, x2, y2, stroke = "black", strokeWidth = 1, cap = "round" /* round, butt, square*/) {
+                    let attributes = { x1, y1, x2, y2, stroke, stroke, "stroke-width": strokeWidth, "stroke-linecap": cap };
+                    return this.createSVGElement('line', attributes);
+                }
+                static polygon(pointsArray, fill = "white", stroke = "black", strokeWidth = 1,
+                    linejoin = "round" /*  miter, bevel, round*/, closed = true) {
+                    let points = "";
+                    for (let point of pointsArray) {
+                        points += point.x + ',' + point.y + ' ';
+                    }
+                    if (closed)
+                        points += pointsArray[0].x + ',' + pointsArray[0].y + ' ';
+                    let attributes = { points, fill, stroke, "stroke-width": strokeWidth, "stroke-linejoin": linejoin };
+                    return this.createSVGElement('polygon', attributes);
+                }
+                static rect(x, y, width, height, fill = "white", stroke = "black", strokeWidth = 1) {
+                    let attributes = { x, y, width, height, fill, stroke, "stroke-width": strokeWidth };
+                    return this.createSVGElement('rect', attributes);
+                }
+                static ellipse(cx, cy, rx, ry, fill = "white", stroke = "black", strokeWidth = 1) {
+                    let attributes = { cx, cy, rx, ry, fill, stroke, "stroke-width": strokeWidth };
+                    return this.createSVGElement('ellipse', attributes);
+                }
+                static text(text, x, y, cssClass = "", styles = "") {
+                    let attributes = { x, y };
+                    let textElem = this.createSVGElement('text', attributes);
+                    textElem.text(text);
+                    if (cssClass !== "") textElem.addClass(cssClass);
+                    if (styles !== "") textElem.attr('style', styles);
+                    return textElem;
+                }
+                static rotate(point, center, angle) {
+                    let a = (180 - angle) / 180 * Math.PI;
+                    let tp = {
+                        x: center.x - point.x,
+                        y: center.y - point.y
+                    };
+                    let rtp = {
+                        x: Math.cos(a) * tp.x + Math.sin(a) * tp.y,
+                        y: -Math.sin(a) * tp.x + Math.cos(a) * tp.y
+                    };
+                    return { x: rtp.x + center.x, y: rtp.y + center.y };
+                }
+                static rotatePolygone(points, center, angle) {
+                    for (let i = 0; i < points.length; i++) {
+                        points[i] = rotate(points[i], center, angle);
+                    }
+                }
+                static cssRotate($elem, center, angle) {
+                    $elem.attr('transform', `rotate(${angle}, ${center.x}, ${center.y})`);
+                }
+            }
+
+            function testShapes() {
+                let svgViewport = $('#svgViewport');
+                svgViewport.append(SVG.line(200, 200, 1800, 1800, 'goldenrod', 20));
+                svgViewport.append(SVG.rect(0, 0, 500, 500, 'red', 'blue', 10));
+                svgViewport.append(SVG.rect(1000, 1000, 500, 500, 'green', 'orange', 10));
+                svgViewport.append(SVG.ellipse(200, 1000, 150, 300, 'magenta', 'black', 30));
+                svgViewport.append(SVG.polygon([{ x: 700, y: 100 }, { x: 1300, y: 300 }, { x: 1000, y: 600 }], 'dodgerblue', 'lightblue', 30,));
+                svgViewport.append(SVG.text("SVG is fun", 400, 400, 'Titan_One'));
+                svgViewport.append(SVG.text("SVG is fun", 400, 600, 'defaultText'));
+            }
+
+            class Clock {
+                constructor(svgContainerId, showTime, showDate, tickSound = true) {
+                    this.now = new Date();
+                    this.showTime = showTime;
+                    this.showDate = showDate;
+                    this.tickSound = tickSound;
+                    this.svgViewport = $("#" + svgContainerId);
+                    let viewBox = SVG.getViewBox(svgContainerId);
+                    this.viewportWidth = viewBox.right - viewBox.left;
+                    this.padding = 0.05 * this.viewportWidth;
+                    this.center = { x: this.viewportWidth / 2, y: this.viewportWidth / 2 };
+                    this.makeClock();
+                    this.start();
+                }
+                makeClock() {
+                    this.svgViewport.append(
+                        SVG.ellipse(
+                            this.center.x,
+                            this.center.y,
+                            this.viewportWidth / 2 - this.padding / 2,
+                            this.viewportWidth / 2 - this.padding / 2, 'white', 'black', 30));
+                    this.makeTicks();
+                    this.makeClockNumbers();
+                    if (this.showTime)
+                        this.makeClockTime();
+                    if (this.showDate)
+                        this.makeDate();
+                    this.makeHandles();
+                }
+                makeTick(length, angle, color, strokeWidth, className) {
+                    let tick1 = { x: this.viewportWidth - this.padding - length, y: this.center.y };
+                    let tick2 = { x: this.viewportWidth - this.padding, y: this.center.y };
+                    tick1 = SVG.rotate(tick1, this.center, angle)
+                    tick2 = SVG.rotate(tick2, this.center, angle)
+                    let tick = SVG.line(tick1.x, tick1.y, tick2.x, tick2.y, color, strokeWidth);
+                    this.svgViewport.append(tick);
+                    SVG.addClass(tick, className);
+                }
+                makeTicks() {
+                    // seconds ticks
+                    let tickLength = 0.015 * this.viewportWidth;
+                    for (let angle = 0; angle <= 360; angle += 6) {
+                        this.makeTick(0.015 * this.viewportWidth, angle, 'lightGray', 5, 'secondsTicks');
+                    }
+                    // minutes ticks
+                    tickLength = 0.03 * this.viewportWidth;
+                    for (let angle = 0; angle <= 360; angle += 30) {
+                        this.makeTick(0.03 * this.viewportWidth, angle, 'gray', 11, 'minutesTicks');
+                    }
+                }
+                makeClockTime() {
+                    let pad = 0.004 * this.viewportWidth;
+                    let anchor = { x: 0.4 * this.viewportWidth, y: 0.25 * this.viewportWidth + 4 * pad };
+                    let width = 0.2 * this.viewportWidth;
+                    let height = 0.040 * this.viewportWidth;
+                    let timeFrame = SVG.rect(anchor.x, anchor.y - height, width, height + pad, 'black', 'black');
+                    this.clockTime = SVG.text("", anchor.x + pad, anchor.y - pad, 'clockTime');
+                    SVG.setId(this.clockTime, 'clockTime');
+                    SVG.setId(timeFrame, 'timeFrame')
+                    this.svgViewport.append(timeFrame);
+                    this.svgViewport.append(this.clockTime);
+                }
+                makeDate() {
+                    let pad = 0.004 * this.viewportWidth;
+                    let anchor = { x: 0.67 * this.viewportWidth, y: 0.5 * this.viewportWidth + 4 * pad };
+                    let width = 0.148 * this.viewportWidth;
+                    let height = 0.040 * this.viewportWidth;
+
+                    let dateFrame = SVG.rect(anchor.x, anchor.y - height, width, height + pad, 'black', 'black');
+                    this.clockDate = SVG.text("", anchor.x + pad, anchor.y - pad, 'clockDate');
+                    SVG.setId(this.clockDate, 'clockDate');
+                    SVG.setId(dateFrame, 'dateFrame');
+                    this.svgViewport.append(dateFrame);
+                    this.svgViewport.append(this.clockDate);
+                }
+                twoDigits(n) {
+                    if (n < 10) return '0' + n; else return n;
+                }
+                setDate() {
+                    let months = ["JAN", "FEB", "MAR", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+                    let now = new Date();
+                    let date = months[this.now.getMonth()] + " " + this.twoDigits(this.now.getDate());
+                    this.clockDate.text(date);
+                }
+                setTime() {
+                    let now = new Date();
+                    let time = this.twoDigits(this.now.getHours()) + ":" + this.twoDigits(this.now.getMinutes()) + ":" + this.twoDigits(this.now.getSeconds());
+                    this.clockTime.text(time);
+                }
+                makeClockNumbers() {
+                    let innerRadius = 0.37 * this.viewportWidth;
+                    for (let hour = 1; hour <= 12; hour++) {
+                        let anchor = SVG.rotate({ x: this.center.x, y: this.center.y - innerRadius }, this.center, hour * 30.0);
+                        this.svgViewport.append(SVG.text(hour, anchor.x, anchor.y, 'clockNumber'));
+                        //this.svgViewport.append(SVG.ellipse(anchor.x, anchor.y, 10, 10, 'red', 'red'));
+                    }
+                }
+                makeHandle(length, tailLength, width, color) {
+                    length *= this.viewportWidth;
+                    tailLength *= this.viewportWidth;
+                    width *= this.viewportWidth;
+                    let centerRadius = width + 0.004 * this.viewportWidth;
+                    let points = [
+                        { x: this.center.x - width, y: this.center.y },
+                        { x: this.center.x, y: this.center.y - length },
+                        { x: this.center.x + width, y: this.center.y },
+                        { x: this.center.x, y: this.center.y + tailLength },
+                        { x: this.center.x - width, y: this.center.y },
+                    ]
+                    let handle = SVG.polygon(points, color, color, 1);
+                    this.svgViewport.append(SVG.ellipse(this.center.x, this.center.y, centerRadius, centerRadius, color, 0));
+                    this.svgViewport.append(handle);
+                    return handle;
+                }
+                makeHandles() {
+                    this.hourHandle = this.hourHandle = this.makeHandle(0.300, 0.077, 0.0184, 'darkgray');
+                    this.minuteHandle = this.makeHandle(0.400, 0.066, 0.014, 'gray');
+                    this.secondHandle = this.makeHandle(0.416, 0.055, 0.004, 'red');
+                }
+                playClockTick() {
+                    let sound = new Audio("clockTick.mp3");
+                    setTimeout(() => { sound.play(); }, 0);
+                }
+                start() {
+                    setInterval(() => {
+                        this.now = new Date();
+                        SVG.cssRotate(this.secondHandle, this.center, this.now.getSeconds() * 6);
+                        SVG.cssRotate(this.minuteHandle, this.center, this.now.getMinutes() * 6.0 + this.now.getSeconds() / 60.0 * 6);
+                        SVG.cssRotate(this.hourHandle, this.center, this.now.getHours() % 12 * 30 + this.now.getMinutes() / 60.0 * 30);
+                        if (this.showDate) this.setDate();
+                        if (this.showTime) this.setTime();
+                        if (this.tickSound) this.playClockTick();
+                    }, 1000);
+                }
+            }
+            new Clock('svgViewport', true 
+            , true, true);
+            //testShapes()
+        </script>
+    </body>
+
+</html>

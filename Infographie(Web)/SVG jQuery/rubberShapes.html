@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+    <header>
+        <style>
+            .draggable {
+                cursor: grab;
+            }
+
+            input {
+                width: 40px;
+            }
+
+            button {
+                width: 80px;
+            }
+
+            .selected {
+                outline: solid cyan;
+            }
+
+            .controlsPane {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-family: sans-serif;
+                background: #f5f6f7;
+                padding: 10px;
+                border-bottom: black solid;
+                -webkit-user-select: none;
+                /* Safari */
+                -ms-user-select: none;
+                /* IE 10 and IE 11 */
+                user-select: none;
+                /* Standard syntax */
+            }
+
+            .controlsPane button {
+                width: 40px;
+                height: 35px;
+                padding: 2px !important;
+            }
+
+            .controlsPane img {
+                height: 25px;
+            }
+
+            .controlsPane input {
+                height: 35px;
+                padding: auto;
+            }
+
+            .controlsPane input[type=checkbox] {
+                height: 20px;
+                padding: auto;
+            }
+
+            .controlsPane input[type=number] {
+                height: 28px;
+                width: 32px;
+                padding: auto;
+            }
+        </style>
+    </header>
+
+    <body>
+        <div class="controlsPane">
+            Hold <input type="checkbox" id="holdCreate" onchange="holdCreate = ! holdCreate">
+            <button id="line" onclick="shapeType = 'line'; createMode = true">
+                <img src="images/line.png" alt="">
+            </button>
+            <button id="Rectangle" onclick="shapeType = 'rect'; createMode = true">
+                <img src="images/rect.png" alt="">
+            </button>
+            <button id="Ellipse" onclick="shapeType = 'ellipse'; createMode = true">
+                <img src="images/ellipse.png" alt="">
+            </button>
+            <img src="images/pen.png" alt=""> <input type="color" id="stroke" value="#000000">
+            <img src="images/fill.png" alt=""> <input type="color" id="fill" value="#ffffff">
+            <img src="images/width.png" alt=""> <input type="number" id="width" value="1">
+        </div>
+
+        <svg id="svgViewport" width="1980" height="1024px" viewbox="0 0 1980 1024">
+            <g id="svgGroup" class="draggable"></g>
+        </svg>
+    </body>
+    <script>
+        const svgns = "http://www.w3.org/2000/svg";
+        let svgViewport = null;
+        let holdCreate = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            svgViewport = document.getElementById("svgViewport");
+            svgViewport.addEventListener("pointerdown", mouseDown);
+            svgViewport.addEventListener("pointermove", mouseMove);
+            svgViewport.addEventListener("pointerup", mouseUp);
+            document.addEventListener("keydown", keydown);
+            document.addEventListener("keyup", keyup);
+            //installMouseEvents();
+        });
+        function installMouseEvents() {
+            let draggables = Array.from(document.getElementsByClassName("draggable"));
+            draggables.forEach(element => {
+                element.removeEventListener("pointerdown", mouseDown);
+                element.removeEventListener("pointermove", mouseMove);
+                element.removeEventListener("pointerup", mouseUp);
+                element.addEventListener("pointerdown", mouseDown);
+                element.addEventListener("pointermove", mouseMove);
+                element.addEventListener("pointerup", mouseUp);
+            });
+
+            document.getElementById('stroke').addEventListener("change", applyStroke);
+            document.getElementById('fill').addEventListener("change", applyFill);
+            document.getElementById('width').addEventListener("change", applyWidth);
+        }
+
+        let currentTarget = null;
+        let createMode = false;
+        let shapeType = 'line'; // line, rect, ellipse
+        let mouseDownPos = { x: 0, y: 0 };
+        let offset = { x: 0, y: 0 };
+        let svgObject = null;
+
+        function applyStroke() {
+            const svgObjects = document.getElementsByClassName('selected');
+            for (let svgObject of svgObjects) {
+                svgObject.setAttribute("stroke", document.getElementById("stroke").value);
+            }
+        }
+        function applyFill() {
+            const svgObjects = document.getElementsByClassName('selected');
+            for (let svgObject of svgObjects) {
+                svgObject.setAttribute("fill", document.getElementById("fill").value);
+            }
+        }
+        function applyWidth() {
+            const svgObjects = document.getElementsByClassName('selected');
+            for (let svgObject of svgObjects) {
+                svgObject.setAttribute("stroke-width", document.getElementById("width").value);
+            }
+        }
+        function extractTranslateValues(translateProp) { //translate( Xpx, ypx) --> {x: X, y: Y}
+            if (translateProp == "") return { x: 0, y: 0 };
+            let cleaned = translateProp.replace("translate(", "")
+                .replace(")", "").replaceAll("px", "")
+                .replaceAll(" ", "").split(",");
+            return { x: parseInt(cleaned[0]), y: parseInt(cleaned[1]) };
+        }
+        function addSVG(svgObject) {
+            document.getElementById("svgGroup").appendChild(svgObject);
+        }
+        function createShape(shapeType) {
+            switch (shapeType) {
+                case 'line':
+                    svgObject = document.createElementNS(svgns, "line");
+                    svgObject.setAttribute("x1", mouseDownPos.x);
+                    svgObject.setAttribute("x2", mouseDownPos.x);
+                    svgObject.setAttribute("y1", mouseDownPos.y);
+                    svgObject.setAttribute("y2", mouseDownPos.y);
+                    svgObject.setAttribute("stroke-linecap", "round");
+                    addSVG(svgObject);
+                    break;
+                case 'rect':
+                    svgObject = document.createElementNS(svgns, "rect");
+                    svgObject.setAttribute("x", mouseDownPos.x);
+                    svgObject.setAttribute("y", mouseDownPos.y);
+                    addSVG(svgObject);
+                    break;
+                case 'ellipse':
+                    svgObject = document.createElementNS(svgns, "ellipse");
+                    svgObject.setAttribute("cx", mouseDownPos.x);
+                    svgObject.setAttribute("cy", mouseDownPos.y);
+                    svgObject.setAttribute("rx", 1);
+                    svgObject.setAttribute("ry", 1);
+                    addSVG(svgObject);
+                    break;
+                default: break;
+            }
+            svgObject.setAttribute("stroke-width", document.getElementById("width").value);
+            svgObject.setAttribute("fill", document.getElementById("fill").value);
+            svgObject.setAttribute("stroke", document.getElementById("stroke").value);
+            svgObject.classList.add('selected');
+            return svgObject;
+        }
+        function reShape(svgObject, mousePos) {
+            let offset = extractTranslateValues(svgObject.style.transform);
+            svgObject.style.cursor = 'crosshair';
+            let deltax = mousePos.x - offset.x - mouseDownPos.x;
+            let deltay = mousePos.y - offset.y - mouseDownPos.y;
+            switch (svgObject.nodeName) {
+                case 'line':
+                    svgObject.setAttribute("x2", mousePos.x - offset.x);
+                    svgObject.setAttribute("y2", mousePos.y - offset.y);
+                    break;
+                case 'rect':
+                    svgObject.setAttribute("width", deltax);
+                    svgObject.setAttribute("height", deltay);
+                    break;
+                case 'ellipse':
+                    svgObject.setAttribute("rx", deltax);
+                    svgObject.setAttribute("ry", deltay);
+                    break;
+                default: break;
+            }
+        }
+        let controlDown = false;
+        function keydown(e) {
+            let ev = e || window.event;  // Event object 'ev'
+            let key = e.which || e.keyCode; //
+
+            if (key == 8 || key == 46) {
+                const svgObjects = document.querySelectorAll('.selected');
+                for (let object of svgObjects) {
+                    object.remove();
+                }
+            } else {
+                let ctrl = e.ctrlKey ? e.ctrlKey : ((key === 17) ? true : false);
+
+                if (ctrl && key == 65) {
+                    console.log(ctrl, key)
+                    const svgViewport = document.querySelectorAll('rect, line, ellipse');
+                    for (let object of svgViewport) {
+                        console.log('s')
+                        object.classList.add('selected');
+                    }
+                }
+            }
+
+        }
+        function keyup(e) {
+            var key = e.keyCode || e.charCode;
+
+
+            controlDown = false;
+        }
+
+        function mouseDown(e) {
+            console.log(e.target.nodeName)
+            mouseDownPos = { x: e.offsetX, y: e.offsetY };
+            currentTarget = e.target;
+            currentTarget.setPointerCapture(e.pointerId);
+            svgObject = null;
+
+            if (createMode) {
+                svgObject = createShape(shapeType);
+                currentTarget = svgObject;
+            } else {
+                offset = extractTranslateValues(currentTarget.style.transform);
+                svgObject = currentTarget;
+                svgViewport.style.cursor = 'move';
+            }
+            if (currentTarget != svgViewport) {
+                svgObject.classList.add('selected');
+                if (e.ctrlKey) {
+                    switch (currentTarget.nodeName) {
+                        case 'line':
+                            mouseDownPos.x = svgObject.getAttribute("x1");
+                            mouseDownPos.y = svgObject.getAttribute("y1");
+                            break;
+                        case 'rect':
+                            mouseDownPos.x = svgObject.getAttribute("x");
+                            mouseDownPos.y = svgObject.getAttribute("y");
+                            break;
+                        case 'ellipse':
+                            mouseDownPos.x = svgObject.getAttribute("cx");
+                            mouseDownPos.y = svgObject.getAttribute("cy");
+                            break;
+                        default: break;
+                    }
+                }
+            } else {
+                const svgObjects = document.querySelectorAll('.selected');
+                if (!e.shiftKey) {
+                    for (let object of svgObjects) {
+                        object.classList.remove('selected');
+                    }
+                }
+            }
+            svgViewport.style.cursor = 'crosshair';
+        }
+        function mouseMove(e) {
+            if (currentTarget) {
+                let mousePos = { x: e.offsetX, y: e.offsetY };
+                if (createMode || e.ctrlKey) {
+                    reShape(svgObject, mousePos);
+                }
+                else {
+                    if (currentTarget != svgViewport) {
+                        let deltax = mousePos.x - mouseDownPos.x;
+                        let deltay = mousePos.y - mouseDownPos.y;
+                        const svgObjects = document.querySelectorAll('.selected');
+                        for (let object of svgObjects) {
+                            object.style.transform = "translate(" + (offset.x + deltax) + "px, " + (offset.y + deltay) + "px)";
+                        }
+                        //currentTarget.style.transform = "translate(" + (offset.x + deltax) + "px, " + (offset.y + deltay) + "px)";
+                    }
+                }
+            }
+        }
+        function mouseUp(e) {
+            if (currentTarget) {
+                currentTarget.releasePointerCapture(e.pointerId);
+                currentTarget.style.cursor = 'move';
+            }
+            currentTarget = null;
+            svgObject = null;
+            createMode = holdCreate;
+            svgViewport.style.cursor = 'default';
+        }
+    </script>
+
+</html>

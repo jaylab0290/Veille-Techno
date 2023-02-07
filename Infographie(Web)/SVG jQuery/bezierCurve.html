@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <style>
+            .draggable {
+                cursor: grab;
+            }
+
+            #svgCanvas {
+                border: 5px solid rgb(25, 0, 255);
+                cursor: crosshair;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            #canvasContainer {
+                overflow: scroll;
+                width: 1000px;
+                height: 1000px;
+                border: 1px solid rgb(0, 0, 0);
+            }
+
+            .handleLink {
+                stroke: black;
+                stroke-width: 1;
+            }
+
+            .handle {
+                stroke: black;
+                fill: white;
+            }
+
+            .hidden {
+                display: none;
+            }
+        </style>
+
+    </head>
+
+    <body>
+        <div id="canvasContainer" width="1000px" height="1000px">
+            <svg id="svgCanvas" width="1000px" height="1000px" viewbox="0 0 1000 1000">
+                <g id="svgGroup" class="draggable"></g>
+            </svg>
+        </div>
+        <script defer>
+
+            const svgns = "http://www.w3.org/2000/svg";
+            const handleSize = 10;
+            let currentIdIndex = 0;
+            let currentTarget = null;
+            function newId() {
+                return currentIdIndex++;
+            }
+
+            let bezierPaths = [];
+
+            class BezierCurve {
+                constructor(pathId, curveIndex, s, p1, p2 = null, e = null) {
+                    this.pathId = pathId;
+                    this.index = curveIndex;
+                    this.s = s;
+                    this.p1 = p1;
+                    this.p2 = p2;
+                    this.e = e;
+                    this.HideStartControl = false;
+                    this.HideEndControl = false;
+
+                    this.sLink = this.addLink(s, p1);
+                    if (p2) this.eLink = this.addLink(p2, e);
+
+                    this.sAnchor = this.addAnchor(s, 'start');
+                    if (e) this.eAnchor = this.addAnchor(e, 'end');
+
+                    this.sControl = this.addControl(p1, 'start');
+                    if (e) this.eControl = this.addControl(p2, 'end');
+
+                    this.update();
+
+                    this.sAnchor.addEventListener("pointerdown", handleMouseDown);
+                    if (e) this.eAnchor.addEventListener("pointerdown", handleMouseDown);
+                    this.sControl.addEventListener("pointerdown", handleMouseDown);
+                    if (e) this.eControl.addEventListener("pointerdown", handleMouseDown);
+                }
+
+                toggleHideStartControl() {
+                    if (!this.HideStartControl)
+                        this.sControl.classList.add('hidden');
+                    else
+                        this.sControl.classList.remove('hidden');
+                    this.HideStartControl = !this.HideStartControl;
+                }
+                toggleHideEndControl() {
+                    if (!this.HideEndControl)
+                        this.eControl.classList.add('hidden');
+                    else
+                        this.eControl.classList.remove('hidden');
+                    this.HideEndControl = !this.HideEndControl;
+                }
+
+                update() {
+                    this.updateAnchor(this.sAnchor, this.s);
+                    this.updateAnchor(this.eAnchor, this.e);
+                    this.updateControl(this.sControl, this.p1);
+                    this.updateControl(this.eControl, this.p2);
+                    this.updateLink(this.sLink, this.s, this.p1);
+                    this.updateLink(this.eLink, this.p2, this.e);
+                }
+                addLink(pos1, pos2) {
+                    let link = document.createElementNS(svgns, "line");
+                    link.setAttribute("pathId", this.pathId);
+                    link.classList.add("handleLink");
+                    addSVG(link);
+                    return link;
+                }
+                addAnchor(pos, order) {
+                    let anchor = document.createElementNS(svgns, "rect");
+                    anchor.setAttribute("width", handleSize);
+                    anchor.setAttribute("height", handleSize);
+                    anchor.setAttribute("pathId", this.pathId);
+                    anchor.setAttribute("curveIndex", this.index);
+                    anchor.setAttribute("type", 'anchor');
+                    anchor.setAttribute("order", order);
+                    anchor.classList.add("handle");
+                    addSVG(anchor);
+                    return anchor;
+                }
+
+                addControl(pos, order) {
+                    let control = document.createElementNS(svgns, "ellipse");
+                    control.setAttribute("rx", handleSize / 2);
+                    control.setAttribute("ry", handleSize / 2);
+                    control.setAttribute("pathId", this.pathId);
+                    control.setAttribute("curveIndex", this.index);
+                    control.setAttribute("type", 'control');
+                    control.setAttribute("order", order);
+                    control.classList.add("handle");
+                    addSVG(control);
+                    return control;
+                }
+                updateLink(link, pos1, pos2) {
+                    if (link) {
+                        link.setAttribute("x1", pos1.x);
+                        link.setAttribute("y1", pos1.y);
+                        link.setAttribute("x2", pos2.x);
+                        link.setAttribute("y2", pos2.y);
+                    }
+                }
+                updateAnchor(anchor, pos) {
+                    if (anchor) {
+                        anchor.setAttribute("x", pos.x - handleSize / 2);
+                        anchor.setAttribute("y", pos.y - handleSize / 2);
+                    }
+                }
+                updateControl(control, pos) {
+                    if (control) {
+                        control.setAttribute("cx", pos.x);
+                        control.setAttribute("cy", pos.y);
+                    }
+                }
+            }
+
+            class BezierPath {
+                constructor() {
+                    this.id = 'bezier_' + newId();
+                    this.curves = [];
+                    this.selected = true;
+                    this.currentCurveIndex = 0;
+                    this.initNode()
+                }
+                initNode() {
+                    this.svgNode = document.createElementNS(svgns, "path");
+                    this.svgNode.setAttribute("id", this.id);
+                    addSVG(this.svgNode);
+                }
+                add(s, p1, p2, e) {
+                    this.curves.push(new BezierCurve(this.id, this.currentCurveIndex++, s, p1, p2, e));
+                    this.update();
+                }
+                bezierCurve(curve) {
+                    let curveData = "";
+                    if (curve.index == 0) {
+                        curveData = `M ${curve.s.x}, ${curve.s.y}`;
+                    }
+                    curveData += ` C ${curve.p1.x},${curve.p1.y} ${curve.p2.x},${curve.p2.y} ${curve.e.x},${curve.e.y}`;
+                    return curveData;
+                }
+                update() {
+                    let pathData = "";
+                    for (let curve of this.curves) {
+                        pathData += this.bezierCurve(curve);
+                    }
+                    this.svgNode.setAttribute("d", pathData);
+                }
+                toggleControl(curve) {
+                    if (curve.type == 'anchor') {
+                        switch (curve.order) {
+                            case 'start':
+                                if (curve.index > 0) {
+                                    if (!this.curves[curve.index].HideStartControl && !this.curves[curve.index - 1].HideEndControl) {
+                                        console.log('hide start')
+                                        this.curves[curve.index].p1 = { ...this.curves[curve.index].s };
+                                        this.curves[curve.index].toggleHideStartControl();
+                                    } else {
+                                        if (this.curves[curve.index].HideStartControl && !this.curves[curve.index - 1].HideEndControl) {
+                                            console.log('hide previous end')
+                                            this.curves[curve.index - 1].p2 = { ...this.curves[curve.index - 1].e };
+                                            this.curves[curve.index - 1].toggleHideEndControl();
+                                        } else {
+                                            if (this.curves[curve.index].HideStartControl && this.curves[curve.index - 1].HideEndControl) {
+                                                console.log('show start')
+                                                this.curves[curve.index].toggleHideStartControl();
+                                            } else {
+                                                console.log('show end')
+                                                this.curves[curve.index - 1].toggleHideEndControl();
+                                                let s = this.curves[curve.index].s;
+                                                let p1 = this.curves[curve.index].p1;
+                                                let p2 = this.curves[curve.index - 1].p2;
+                                                this.curves[curve.index - 1].p2.x = p2.x - (p1.x - s.x);
+                                                this.curves[curve.index - 1].p2.y = p2.y - (p1.y - s.y);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    this.curves[curve.index].p1 = { ...this.curves[curve.index].s };
+                                    this.curves[curve.index].toggleHideStartControl();
+                                }
+                                break;
+                            case 'end':
+                                console.log('toggle end')
+                                this.curves[curve.index].p2 = { ...this.curves[curve.index].e };
+                                this.curves[curve.index].toggleHideEndControl();
+                                break;
+                            default: break;
+                        }
+                    }
+                    this.update();
+                    this.curves[curve.index].update();
+                    if (curve.index > 0)
+                        this.curves[curve.index - 1].update();
+                }
+                broken(c1, a, c2) {
+                    let dx = Math.abs((c1.x - a.x) - (a.x - c2.x));
+                    let dy = Math.abs((c1.y - a.y) - (a.y - c2.y));
+                    let broked = (dx + dy) > 5;
+                    console.log('broken', broked, dx, dy, c1, a, c2);
+                    return broked;
+                }
+                moveHandle(curve, deltax, deltay, ctrl = false) {
+                    switch (curve.type) {
+                        case 'anchor':
+                            switch (curve.order) {
+                                case 'start':
+                                    this.curves[curve.index].s.x += deltax; this.curves[curve.index].s.y += deltay;
+                                    this.curves[curve.index].p1.x += deltax; this.curves[curve.index].p1.y += deltay;
+                                    if (curve.index > 0) {
+                                        this.curves[curve.index - 1].e.x += deltax; this.curves[curve.index - 1].e.y += deltay;
+                                        this.curves[curve.index - 1].p2.x += deltax; this.curves[curve.index - 1].p2.y += deltay;
+                                        this.curves[curve.index - 1].update();
+                                    }
+                                    break;
+                                case 'end':
+                                    this.curves[curve.index].e.x += deltax; this.curves[curve.index].e.y += deltay;
+                                    this.curves[curve.index].p2.x += deltax; this.curves[curve.index].p2.y += deltay;
+                                    if (curve.index != (this.curves.length - 1)) {
+                                        this.curves[curve.index + 1].s.x += deltax; this.curves[curve.index + 1].s.y += deltay;
+                                        this.curves[curve.index + 1].p1.x += deltax; this.curves[curve.index + 1].p1.y += deltay;
+                                        this.curves[curve.index + 1].update();
+                                    }
+                                    break;
+                                default: break;
+                            }
+                            break;
+                        case 'control':
+                            switch (curve.order) {
+                                case 'start':
+                                    let previousP1 = { ...this.curves[curve.index].p1 };
+                                    this.curves[curve.index].p1.x += deltax; this.curves[curve.index].p1.y += deltay;
+                                    if (!ctrl) {
+                                        if (curve.index > 0) {
+                                            if (!this.curves[curve.index - 1].HideEndControl && !this.broken(previousP1, this.curves[curve.index].s, this.curves[curve.index - 1].p2)) {
+                                                this.curves[curve.index - 1].p2.x -= deltax;
+                                                this.curves[curve.index - 1].p2.y -= deltay;
+                                                this.curves[curve.index - 1].update();
+                                            }
+                                        }
+                                    }
+                                    break;
+                                case 'end':
+                                    let previousP2 = { ...this.curves[curve.index].p2 };
+                                    this.curves[curve.index].p2.x += deltax; this.curves[curve.index].p2.y += deltay;
+                                    if (!ctrl) {
+                                        if (curve.index != (this.curves.length - 1)) {
+                                            if (!this.curves[curve.index + 1].HideStartControl && !this.broken(previousP2, this.curves[curve.index].e, this.curves[curve.index + 1].p1)) {
+                                                this.curves[curve.index + 1].p1.x -= deltax;
+                                                this.curves[curve.index + 1].p1.y -= deltay;
+                                                this.curves[curve.index + 1].update();
+                                            }
+                                        }
+                                    }
+                                    break;
+                                default: break;
+                            }
+                            break;
+                        default: break;
+                    }
+
+                    this.update();
+                    this.curves[curve.index].update();
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                svgViewport = document.getElementById("svgCanvas");
+                svgViewport.addEventListener("pointerdown", mouseDown);
+                svgViewport.addEventListener("pointermove", mouseMove);
+                svgViewport.addEventListener("pointerup", mouseUp);
+                document.addEventListener("keydown", keydown);
+                document.addEventListener("keyup", keyup);
+            });
+
+            function addSVG(svgObject) {
+                document.getElementById("svgGroup").appendChild(svgObject);
+            }
+
+
+            function makeBezier() {
+                let bezierPath = new BezierPath();
+                bezierPaths.push(bezierPath);
+                bezierPath.add(
+                    { x: 100, y: 500 },
+                    { x: 100, y: 100 },
+                    { x: 500, y: 100 },
+                    { x: 500, y: 500 });
+                bezierPath.add(
+                    { x: 500, y: 500 },
+                    { x: 500, y: 900 },
+                    { x: 900, y: 900 },
+                    { x: 900, y: 500 });
+                // bezierPath.moveHandle(0, 'anchor', 'start', 100, 0);
+                // bezierPath.moveHandle(1, 'control', 'start', 100, 0);
+            }
+
+            makeBezier();
+
+            function keydown(e) {
+                let ev = e || window.event;
+                let key = e.which || e.keyCode; //
+
+                if (key == 8 || key == 46) { // delete selected
+                    const svgObjects = document.querySelectorAll('.selected');
+                    for (let object of svgObjects) {
+                        object.remove();
+                    }
+                } else {
+                    let ctrl = e.ctrlKey ? e.ctrlKey : ((key === 17) ? true : false)
+                    if (ctrl && key == 65) { // select all
+                        const svgViewport = document.querySelectorAll(' to do');
+                        for (let object of svgViewport) {
+                            object.classList.add('selected');
+                        }
+                    }
+                }
+            }
+            function keyup(e) {
+                var key = e.keyCode || e.charCode;
+                controlDown = false;
+            }
+
+            let currentPath = null;
+            let currentPathCurve = null;
+
+            function handleMouseDown(e) {
+                console.log('handle mouse down')
+                mouseDownPos = { x: e.offsetX, y: e.offsetY };
+                handle = e.target;
+                bezierPathIndex = parseInt(handle.getAttribute('pathId').split('_')[1]);
+                currentPath = bezierPaths[bezierPathIndex];
+                currentPathCurve = {
+                    index: parseInt(handle.getAttribute('curveIndex')),
+                    type: handle.getAttribute('type'),
+                    order: handle.getAttribute('order')
+                }
+                if (e.ctrlKey) currentPath.toggleControl(currentPathCurve);
+            }
+
+            let lastMousePos;
+            function mouseDown(e) {
+                console.log('panel mouse down')
+                mouseDownPos = { x: e.offsetX, y: e.offsetY };
+                currentTarget = e.target;
+                currentTarget.setPointerCapture(e.pointerId);
+                currentTarget.style.cursor = 'crosshair';
+                lastMousePos = mouseDownPos;
+            }
+
+            function mouseMove(e) {
+                if (currentTarget) {
+
+                    let d = { x: e.offsetX - lastMousePos.x, y: e.offsetY - lastMousePos.y };
+                    currentPath.moveHandle(currentPathCurve, d.x, d.y, e.ctrlKey)
+                    lastMousePos = { x: e.offsetX, y: e.offsetY }
+                }
+            }
+            function mouseUp(e) {
+                if (currentTarget) {
+                    currentTarget.releasePointerCapture(e.pointerId);
+                    currentTarget.style.cursor = 'move';
+                }
+                currentTarget = null;
+                currentPath = null;
+                currentPathCurve = null;
+            }
+        </script>
+    </body>
+
+</html>

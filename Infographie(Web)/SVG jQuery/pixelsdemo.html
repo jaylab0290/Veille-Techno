@@ -1,0 +1,112 @@
+<html>
+
+<body style="background-color: black;padding: 0px;">
+    <canvas id="canvas" width="1900px" height="1200px" style="background-color: black;margin: 0px;"></canvas>
+</body>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => { init(); });
+
+    var canvas;
+    var ctx;
+    var canvasWidth;
+    var canvasHeight;
+    var image;
+    var bitmap;
+
+    function init() {
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        canvasWidth = canvas.width;
+        canvasHeight = canvas.height;
+        getBitmap();
+        //fillRandomBitmap();
+        //fillBlend1Bitmap();
+        //fillBlend2Bitmap();
+        //fillBlend3Bitmap();
+        fillSinusBitmap();
+        drawBitmap();
+        /*
+        setInterval(() => {
+            fillRandomBitmap();
+        drawBitmap();
+        }, 100);
+        */
+        
+    }
+
+    function getBitmap() {
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        image = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+        bitmap = image.data;
+    }
+    function setPixel(x, y, r, g, b, a) {
+        var offset = (y * image.width + x) * 4;
+        bitmap[offset] = r;
+        bitmap[offset + 1] = g;
+        bitmap[offset + 2] = b;
+        bitmap[offset + 3] = a;
+    }
+
+    function fillRandomBitmap() {
+        for (let x = 0; x < canvasWidth; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                var r = Math.floor(Math.random() * 256);
+                var g = Math.floor(Math.random() * 256);
+                var b = Math.floor(Math.random() * 256);
+                var a = 255;
+                setPixel(x, y, r, g, b, a);
+            }
+        }
+    }
+    function fillBlend1Bitmap() {
+        for (let x = 0; x < canvasWidth; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                var r = 255;
+                var g = 255 * y / canvasHeight;
+                var b = 255 * x / canvasWidth;
+                var a = 255;
+                setPixel(x, y, r, g, b, a);
+            }
+        }
+    }
+    function fillBlend2Bitmap() {
+        for (let x = 0; x < canvasWidth; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                var r = 255 * y / canvasHeight;
+                var g = 255;
+                var b = 255 * x / canvasWidth;
+                var a = 255;
+                setPixel(x, y, r, g, b, a);
+            }
+        }
+    }
+    function fillBlend3Bitmap() {
+        for (let x = 0; x < canvasWidth; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                var r = 255 * y / canvasHeight;
+                var g = 255 * x / canvasWidth;
+                var b = 255;
+                var a = 255;
+                setPixel(x, y, r, g, b, a);
+            }
+        }
+    }
+    function fillSinusBitmap() {
+        for (let x = 0; x < canvasWidth; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                var r = Math.abs(Math.cos((x + y) * 2 / canvasWidth * Math.PI) * 255);
+                var g = 0;
+                var b = Math.abs(Math.sin((x + y) * 2 / canvasWidth * Math.PI) * 255);
+                var a = 255;
+                setPixel(x, y, r, g, b, a);
+            }
+        }
+    }
+    function drawBitmap() {
+        ctx.putImageData(image, 0, 0);
+    }
+
+</script>
+
+</html>

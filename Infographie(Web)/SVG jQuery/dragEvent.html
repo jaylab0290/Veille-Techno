@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <style>
+        #container_A { width: 400px; height: 300px; background-color: lightgreen; overflow: auto;}
+        #container_B { width: 400px; height: 300px; background-color: lightblue; overflow: auto;}
+        .draggable { position:relative; width: 100px; height: 60px;cursor:grab;}
+    </style>
+</header>
+<body>
+    <div id="container_A"><div class="draggable" style="background-color:darkgreen;"></div></div><br>
+    <div id="container_B"><div class="draggable" style="background-color:blue;"></div></div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let draggables = Array.from(document.getElementsByClassName("draggable"));
+        draggables.forEach(element => {
+            element.addEventListener("pointerdown", mouseDown);
+            element.addEventListener("pointermove", mouseMove);
+            element.addEventListener("pointerup", mouseUp);
+        });
+    });
+    let target = null;
+    let mouseDownPos = { x: 0, y: 0 };
+    function getPixelValue(pixelValue) {
+        if (pixelValue == "") return 0;
+        return parseFloat(pixelValue.replace("px", ""));
+    }
+    function mouseDown(e) {
+        target = e.target;
+        target.setPointerCapture(e.pointerId);
+        mouseDownPos = { x: e.offsetX, y: e.offsetY };
+    }
+    function mouseMove(e) {
+        if (target) {
+            let mousePos = { x: e.offsetX, y: e.offsetY };
+            let newLeft = getPixelValue(target.style.left) + mousePos.x - mouseDownPos.x;
+            let newTop = getPixelValue(target.style.top) + mousePos.y - mouseDownPos.y;
+            target.style.left = (newLeft >= 0 ? newLeft: 0) + "px";
+            target.style.top = (newTop >= 0 ? newTop: 0) + "px";
+        }
+    }
+    function mouseUp(e){
+        target.releasePointerCapture(e.pointerId);
+        target = null;
+    }
+</script>
+</html>

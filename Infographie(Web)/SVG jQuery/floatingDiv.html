@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <style>
+        .dialog {
+            position: absolute;
+            border: 1px solid blue;
+            background-color: cyan;
+            padding-right: 2px;
+            padding-bottom: 2px;
+            min-width: 400px;
+            min-height: 300px;
+        }
+
+        .dialogHeader {
+            border: 1px solid gray;
+            width: 100%;
+            height: 42px;
+            user-select: none;
+            cursor: all-scroll;
+            padding:0px;
+        }
+
+        .dialogResizeZone {
+            border: none;
+            position: absolute;
+            cursor: nw-resize;
+            border: node;
+        }
+        .dialogTitle {
+            margin-left: 5px;
+        }
+        .dialogContent {
+            margin:0px;
+            background-color: greenyellow;
+            height: calc(100% - 60px);
+            overflow: auto;
+            padding:8px;
+        }
+    </style>
+</header>
+
+<body>
+    <h1>
+        Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's
+        standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make
+        a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting,
+        remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing
+        Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions
+        of Lorem Ipsum.
+
+        Why do we use it?
+        It is a long established fact that a reader will be distracted by the readable content of a page when looking at
+        its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as
+        opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing
+        packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum'
+        will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by
+        accident, sometimes on purpose (injected humour and the like).
+
+
+        Where does it come from?
+        Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin
+        literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney
+        College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and
+        going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum
+        comes from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" (The Extremes of Good and Evil) by
+        Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance.
+        The first line of Lorem Ipsum, "Lorem ipsum dolor sit amet..", comes from a line in section 1.10.32.
+
+        The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested. Sections
+        1.10.32 and 1.10.33 from "de Finibus Bonorum et Malorum" by Cicero are also reproduced in their exact original
+        form, accompanied by English versions from the 1914 translation by H. Rackham.
+        </pre>
+        <div id="dialog" class="dialog">
+            <div class="dialogContent"> <h3>drag me</h3> 
+                Where does it come from?
+                Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin
+                literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney
+                College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and
+                going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum
+                comes from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" (The Extremes of Good and Evil) by
+                Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance.
+                The first line of Lorem Ipsum, "Lorem ipsum dolor sit amet..", comes from a line in section 1.10.32.</div>
+           
+        </div>
+</body>
+<script>
+    let currentDialog = null;
+    let currentDialogResizeZone = null;
+    const size = 22;
+    const minWidth = 400;
+    const minHeight = 300;
+    document.addEventListener('DOMContentLoaded', () => { init(); });
+    function init() {
+        let dialog = document.getElementById("dialog");
+        centerDialog(dialog);
+        makeDialogHeader(dialog, "Mon dialogue");
+        makeDialogResizeZone(dialog);
+    }
+
+    let mouseDownPos = { x: 0, y: 0 };
+    let mouseIsDown = false;
+
+    function centerDialog(dialog, maxWidth = 600, maxHeight = 400) {
+        let windowWidth = window.innerWidth;
+        let windowHeight = window.innerHeight;
+        let width = windowWidth * 0.8;
+        if (width > maxWidth) width = maxWidth;
+        let height = windowHeight * 0.6;
+        if (height > maxHeight) height = maxHeight;
+        dialog.style.width = width + "px";
+        dialog.style.height = height + "px";
+        dialog.style.left = windowWidth / 2 - width / 2 + "px";
+        dialog.style.top = "100px";
+    }
+
+    function getPixelValue(pixelValue) {
+        return parseFloat(pixelValue.replace("px", ""));
+    }
+
+    function makeDialogHeader(dialog, title = "Dialog") {
+        let header = document.createElement("div");
+        header.innerHTML = "<span class='dialogTitle'>" + title + "</span>";
+        header.classList.add("dialogHeader");
+        header.addEventListener("pointerdown", dialogMouseDown, true);
+        header.addEventListener("pointermove", dialogMouseMove, true);
+        header.addEventListener("pointerup", dialogMouseUp);
+        dialog.prepend(header);
+    }
+
+    function makeDialogResizeZone(dialog) {
+        let resizeZone = document.createElement("div");
+        resizeZone.classList.add("dialogResizeZone");
+        resizeZone.addEventListener("pointerdown", dialogResizeMouseDown, true);
+        resizeZone.addEventListener("pointermove", dialogResizeMouseMove, true);
+        resizeZone.addEventListener("pointerup", dialogResizeMouseUp);
+        resizeZone.style.left = getPixelValue(dialog.style.width) - size + "px";
+        resizeZone.style.top = getPixelValue(dialog.style.height) - size + "px";
+        resizeZone.style.width = size + "px";
+        resizeZone.style.height = size  + "px";
+        dialog.appendChild(resizeZone);
+    }
+    function setTopLeft(element, topLeft) {
+        element.style.left = topLeft.x + "px";
+        element.style.top = topLeft.y + "px";
+    }
+    function getTopLeft(element) {
+        let topLeft = { x: 0, y: 0 };
+        topLeft.x = getPixelValue(element.style.left);
+        topLeft.y = getPixelValue(element.style.top);
+        return topLeft;
+    }
+    function dialogMouseDown(e) {
+        currentDialog = e.target;
+        currentDialog.setPointerCapture(e.pointerId);
+        mouseDownPos.x = e.offsetX;
+        mouseDownPos.y = e.offsetY;
+    }
+    function dialogMouseMove(e) {
+        if (currentDialog) {
+            let dialog = currentDialog.parentNode;
+            let topLeft = getTopLeft(dialog);
+            let newLeft = topLeft.x + e.offsetX - mouseDownPos.x;
+            let newTop = topLeft.y + e.offsetY - mouseDownPos.y
+            let width = getPixelValue(dialog.style.width);
+            let height = getPixelValue(dialog.style.height);
+            if (newLeft <= 0) newLeft = 0;
+            if (newTop <= 0) newTop = 0;
+            if (newLeft + width > window.innerWidth) newLeft = window.innerWidth - width - 10;
+            if (newTop + height > window.innerHeight) newTop = window.innerHeight - height - 10;
+            setTopLeft(dialog, { x: newLeft, y: newTop });
+        }
+    }
+    function dialogMouseUp(e) {
+        if (currentDialog) {
+            currentDialog.releasePointerCapture(e.pointerId);
+            currentDialog = null;
+        }
+    }
+    function dialogResizeMouseDown(e) {
+        currentDialogResizeZone = e.target;
+        currentDialogResizeZone.setPointerCapture(e.pointerId);
+        mouseDownPos.x = e.offsetX;
+        mouseDownPos.y = e.offsetY;
+    }
+    function dialogResizeMouseMove(e) {
+        if (currentDialogResizeZone) {
+            let dialog = currentDialogResizeZone.parentNode;
+            let topLeft = getTopLeft(currentDialogResizeZone);
+            let newLeft = topLeft.x + e.offsetX - mouseDownPos.x;
+            let newTop = topLeft.y + e.offsetY - mouseDownPos.y;
+            if (newTop < minHeight - size) newTop = minHeight - size;
+            if (newLeft < minWidth - size) newLeft = minWidth - size;
+            setTopLeft(currentDialogResizeZone, { x: newLeft, y: newTop });
+            dialog.style.width = newLeft + size + "px";
+            dialog.style.height = newTop + size + "px";
+        }
+    }
+    function dialogResizeMouseUp(e) { 
+        if (currentDialogResizeZone) {
+            currentDialogResizeZone.releasePointerCapture(e.pointerId);
+            currentDialogResizeZone = null;
+        }
+    }
+    </script>
+
+</html>

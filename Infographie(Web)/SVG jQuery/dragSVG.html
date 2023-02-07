@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <style>
+        .draggable { cursor:grab; }
+    </style>
+</header>
+<body>
+   <svg width="800" height="600px" viewbox="0 0 800 600">
+       <g class="draggable" >
+            <rect x="10" y="200" width="125" height="75" style="fill: blue; stroke: red;"/>
+            <ellipse cx="210" cy="300" rx="60" ry="30" fill="green" stroke="black" />
+            <polygon fill="orange" stroke="red" stroke-width="3"
+                points="125,37.5 179,68.75 179,131.25 125,162.5 71,131.3 71,68.75" />
+       </g>
+   </svg>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let draggables = Array.from(document.getElementsByClassName("draggable"));
+        draggables.forEach(element => {
+            element.addEventListener("pointerdown", mouseDown);
+            element.addEventListener("pointermove", mouseMove);
+            element.addEventListener("pointerup", mouseUp);
+        });
+    });
+    let target = null;
+    let mouseDownPos = { x: 0, y: 0 };
+    function extractTranslateValues(translateProp) { //translate( Xpx, ypx) --> {x: X, y: Y}
+        if (translateProp == "") return { x:0, y:0 };
+        let cleaned = translateProp.replace("translate(", "")
+                                    .replace(")", "").replaceAll("px", "")
+                                    .replaceAll(" ", "").split(",");
+        return { x: parseInt(cleaned[0]), y: parseInt(cleaned[1]) };
+    }
+    let offset = {x:0, y:0};
+    function mouseDown(e) {
+        target = e.target;
+        target.setPointerCapture(e.pointerId);
+        mouseDownPos = { x: e.offsetX, y: e.offsetY };
+        offset = extractTranslateValues(target.style.transform);
+    }
+    function mouseMove(e) {
+        if (target) {
+            let mousePos = { x: e.offsetX, y: e.offsetY };
+            let deltax = offset.x + mousePos.x - mouseDownPos.x;
+            let deltay = offset.y + mousePos.y - mouseDownPos.y;
+            target.style.transform = "translate(" + deltax + "px, " +  deltay + "px)";
+        }
+    }
+    function mouseUp(e){
+        target.releasePointerCapture(e.pointerId);
+        target = null;
+    }
+</script>
+</html>

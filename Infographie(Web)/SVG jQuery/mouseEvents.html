@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <style>
+        #container_A { width: 400px; height: 300px; background-color: lightgreen; cursor:crosshair;}
+        #container_B { width: 400px; height: 300px; background-color: lightblue; cursor:crosshair;}
+    </style>
+</header>
+<body>
+    <span id="button">button: up</span>
+    <span id="position">position: 0, 0</span>
+    <hr>
+    <div id="container_A">container_A </div> <br>
+    <div id="container_B">container_B </div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById("container_A").addEventListener("pointerdown", mouseDown);
+        document.getElementById("container_A").addEventListener("pointermove", mouseMove);
+        document.getElementById("container_A").addEventListener("pointerup", mouseUp);
+        document.getElementById("container_B").addEventListener("pointerdown", mouseDown);
+        document.getElementById("container_B").addEventListener("pointermove", mouseMove);
+        document.getElementById("container_B").addEventListener("pointerup", mouseUp);
+    });
+    let target = null;
+    let mouseDownPos = { x: 0, y: 0 };
+    function showButtonStatus(down){
+        document.getElementById("button").innerHTML = "button:" + (down? "down": "up");
+    }
+    function showMousePosition(pos){
+        document.getElementById("position").innerHTML = "position: " + pos.x + ", " + pos.y;
+    }
+    function mouseDown(e) {
+        target = e.target;
+        target.setPointerCapture(e.pointerId);
+        mouseDownPos = { x: e.offsetX, y: e.offsetY };
+        showButtonStatus(true);
+        showMousePosition(mouseDownPos);
+    }
+    function mouseMove(e) {
+        if (target) {
+            let mousePos = { x: e.offsetX, y: e.offsetY };
+            showButtonStatus(true);
+            showMousePosition(mousePos);
+        }
+    }
+    function mouseUp(e){
+        target.releasePointerCapture(e.pointerId);
+        target = null;
+        showButtonStatus(false);
+    }
+</script>
+</html>

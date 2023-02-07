@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bouncing ball</title>
+    <style>
+        button {
+            font-size:large;
+            width:160px;
+        }
+        canvas{
+            border:5px solid gray;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="drawingContext" width="800" height="800"> </canvas>
+    <h2>
+        <button id="btn_add">add ball</button>
+        <button id="btn_start">start</button>
+        <button id="btn_sound">sound of</button>
+    </h2>
+
+<script>
+
+    class Point {
+        constructor (x, y){
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    class RGBA {
+        constructor(r = 255, g = 255, b = 255, a = 1){
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        randomize () {
+            this.r = Math.random()*255;
+            this.g = Math.random()*255;
+            this.b = Math.random()*255;
+            this.a = Math.random()*0.5 +0.5;
+            return this;
+        }
+
+        toString() {
+            return "rgba(" + this.r + "," + this.g + "," + this.b + "," + this.a + ")";
+        }
+    }
+
+    class Ball {
+        constructor (position, direction, color, canvas, bouncingSoundURL) {
+            this.position = position;
+            this.direction = direction;
+            this.canvas = canvas;
+            this.color = color;
+            this.bouncingSoundURL = bouncingSoundURL;
+            this.sound = true;
+            this.radius = 25;
+        }
+
+        bounce(direction){
+            direction = - direction;
+
+            if (this.sound) {
+                let sound = new Audio(this.bouncingSoundURL);
+                setTimeout(() => { sound.play(); }, 0);
+            }
+
+            let randomizeBounceDirection = ((Math.random() >= 0.5 ? 1 : -1) * Math.random()*1/100) * direction;
+            let newDirection = randomizeBounceDirection + direction;
+
+            return newDirection;
+        }
+
+        move() {
+            this.position.x += this.direction.x;
+            this.position.y += this.direction.y;
+
+            if ((this.position.x <= this.radius/2) || (this.position.x > this.canvas.width - this.radius/2)) {
+                this.direction.x = this.bounce(this.direction.x);
+            }
+            if ((this.position.y <= this.radius/2) || (this.position.y > this.canvas.height - this.radius/2)) {
+                this.direction.y = this.bounce(this.direction.y);
+            }
+        }
+
+        draw() {
+            this.canvas.beginPath();
+            this.canvas.ellipse(this.position.x, this.position.y, this.radius, this.radius, 0, 0, 2 * Math.PI);
+            this.canvas.closePath();
+            this.canvas.fillStyle = this.color.toString();
+            this.canvas.fill();
+        }
+    }
+
+    class Balls {
+        constructor(canvas, bounceSoundURL){
+            this.canvas = canvas;
+            this.bounceSoundURL = bounceSoundURL;
+            this.balls = [];
+        }
+
+        addRandomizedBall() {
+            let ball = new Ball(new Point(this.canvas.width / 2, this.canvas.height / 2) /* position */,
+                                new Point( Math.random() * 10 - 5 , Math.random() * 10 - 5)/* direction */,
+                                new RGBA().randomize(), /* color */
+                                this.canvas,
+                                this.bounceSoundURL);
+            ball.sound = soundActivated;
+            ball.draw();
+            this.balls.push(ball);
+        }
+
+        eraseCanvas() {
+            this.canvas.beginPath();
+            this.canvas.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.canvas.closePath();
+        }
+
+        move() {
+            this.eraseCanvas();
+            for(let ball of this.balls) {
+                ball.move();
+                ball.draw();
+            }
+        }
+
+        set soundActivated (value) {
+            for(let ball of this.balls) {
+                ball.sound = value;
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', init_UI);
+
+    let balls = null;
+    let timerStarted = false;
+    let soundActivated = false;
+    let refresh_Interval = 10; /* miliseconds */
+    
+    function init_UI() {
+        document.getElementById('btn_start').addEventListener('click', startStopTimer);
+        document.getElementById('btn_add').addEventListener('click', addBall);
+        document.getElementById('btn_sound').addEventListener('click', toogleSound);
+
+        init_Balls();
+    }
+
+    function get_Canvas(id) {
+        let canvasElem = document.getElementById(id);
+        canvas = canvasElem.getContext('2d');
+        canvas.width = canvasElem.width;
+        canvas.height = canvasElem.height;
+        return canvas;
+    }
+
+    function init_Balls() {
+        let canvasCTX = get_Canvas('drawingContext');
+        balls = new Balls(canvasCTX, 'clockTick.mp3');
+        balls.addRandomizedBall();
+    }
+
+    function startStopTimer() {
+        if (!timerStarted) {
+            timerStarted = true;
+            document.getElementById('btn_start').innerText = "stop";
+            timerId = setInterval(()=>{ balls.move(); }, refresh_Interval);
+        }  else {
+            timerStarted = false;
+            document.getElementById('btn_start').innerText = "start";
+            clearTimeout(timerId);
+            document.getElementById('btn_start').set
+        }
+    }
+
+    function addBall() {
+            balls.addRandomizedBall();
+    }
+
+    function toogleSound() {
+        let btn_sound = document.getElementById('btn_sound');
+        soundActivated = !soundActivated;
+
+        if (!soundActivated)
+            btn_sound.innerText = "sound off";
+        else
+            btn_sound.innerText = "sound on";
+
+        balls.soundActivated = soundActivated;
+    }
+
+</script>
+</body>
+</html>
+

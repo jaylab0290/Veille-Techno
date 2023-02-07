@@ -1,0 +1,153 @@
+<html>
+    <style>
+        .content {
+            margin: auto;
+            background-color: darkorange;
+            height: 100vh;
+            max-width: 1200px;
+        }
+
+        .header {
+            max-width: 1200px;
+            height: 100px;
+            margin:auto;
+        }
+        #canvas {
+
+            
+        }
+    </style>
+
+    <body style="background-color: black;">
+        <div class="header">
+            <canvas id="canvas" width="1200px" height="100px" style="background-color: black;margin: 0px;"></canvas>
+        </div>
+
+        <div class="content">
+            <h1>contenu de la page</h1>
+        </div>
+    </body>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { init(); });
+
+        var canvas;
+        var ctx;
+        var canvasWidth;
+        var canvasHeight;
+        var image;
+        var bitmap;
+        let damp = 3.0;
+
+        function init() {
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+            getBitmap();
+
+            drawBitmap();
+            heat();
+
+            setInterval(() => {
+                heat();
+            }, 40);
+
+            setInterval(() => {
+                fire();
+                drawBitmap();
+            }, 82);
+
+            setInterval(() => {
+                damp = 3.03 + Math.floor(Math.random() * 0.25);
+            }, 500);
+
+        }
+
+        function getBitmap() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            image = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+            bitmap = image.data;
+        }
+        function setPixel(x, y, r, g, b, a) {
+            var offset = (y * image.width + x) * 4;
+            bitmap[offset] = r;
+            bitmap[offset + 1] = g;
+            bitmap[offset + 2] = b;
+            bitmap[offset + 3] = a;
+        }
+
+        function getpixel(x, y, index) {
+            if (x < 0) return 0;
+            if (x + 1 > canvasWidth) return 0;
+            if (y < 0) return 0;
+            if (y + 1 > canvasHeight) return 0;
+            var offset = (y * image.width + x) * 4;
+            return bitmap[offset + index];
+        }
+
+
+        function average(x, y) {
+            let d = Math.floor(Math.random() * 2);
+            let s = Math.round(0.8 - Math.floor(Math.random() * 5));
+            let r = (getpixel(x - d, y + 1, 0) + getpixel(x, y + 1, 0) + getpixel(x + d, y + 1, 0)) / damp;
+            let g = (getpixel(x - d, y + s, 1) + getpixel(x, y + s, 1) + getpixel(x + d, y + 1, 1)) / damp;
+            let b = (getpixel(x - d, y + 1, 2) + getpixel(x, y + s, 2) + getpixel(x + d, y + s, 2)) / damp;
+            setPixel(x - d * s, y, r, g, b, 255);
+        }
+
+        function heat() {
+            let gran = 90;
+            for (let x = gran; x < canvasWidth - gran; x += gran) {
+                let d = 55 - Math.floor(Math.random() * 55);
+                var r = Math.floor(Math.random() * 256);
+               
+                for (let w = x - gran; w < x + gran; w++) {
+                    if (w >= 0 && w < canvasWidth)
+                        setPixel(w, canvasHeight - 1, r, r / 2, 0, 255);
+                }
+            }
+            gran = 60;
+            for (let x = gran; x < canvasWidth - gran; x += gran) {
+                let d = 55 - Math.floor(Math.random() * 55);
+                var r = Math.floor(Math.random() * 256);
+                var g = Math.floor(Math.random() * 32);
+                var b = Math.floor(Math.random() * 80);
+                for (let w = x - gran; w < x + gran; w++) {
+                    if (w >= 0 && w < canvasWidth)
+                        setPixel(w, canvasHeight - 2, r, r / 2, 0, 255);
+                }
+            }
+            gran = 10;
+            for (let x = gran; x < canvasWidth - gran; x += gran) {
+                let d = 55 - Math.floor(Math.random() * 55);
+                var r = Math.floor(Math.random() * 256);
+                var g = Math.floor(Math.random() * 32);
+                var b = Math.floor(Math.random() * 80);
+                for (let w = x - gran; w < x + gran; w++) {
+                    if (w >= 0 && w < canvasWidth)
+                        setPixel(w, canvasHeight - 3, r, r / 2, 0, 255);
+                }
+            }
+        }
+        function fire() {
+            for (let y = canvasHeight - 4; y >= 0; y--) {
+                for (let x = 0; x < canvasWidth; x++) {
+                    average(x, y);
+                }
+            }
+        }
+
+
+        function drawBitmap() {
+            ctx.putImageData(image, 0, 0);
+            ctx.font = "60px Arial";
+            ctx.fillStyle = "red";
+            ctx.fillText("Html canvas", 120, canvasHeight - 16);
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, canvasHeight - 5, canvasWidth, 5);
+        }
+
+    </script>
+
+</html>

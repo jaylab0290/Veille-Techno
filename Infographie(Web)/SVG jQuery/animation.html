@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        .star {
+            fill: gold;
+            stroke: goldenrod;
+            stroke-width: 5px;
+        }
+    </style>
+
+</head>
+
+<body>
+    <h1>Animation</h1>
+    <div id="svgContainer">
+
+        <svg id="svgCanvas" width="1000px" height="1000px" viewbox="0 0 1000 1000">
+
+            <!-- <animate attributeType="CSS" attributeName="opacity" from="1" to="0.2" dur="10.1s" repeatCount="indefinite" /> -->
+
+            <g id="starA">
+                <polygon  class="star" fill="#F8F65F" stroke="#F7BA3F" style="transform: translate(0px, 0px)"
+                    points="82.99,23.438 69.055,66.212 24.069,66.247 60.443,92.716 46.575,135.511 82.99,109.098 119.405,135.511 105.537,92.716 141.91,66.247 96.924,66.211 ">
+                </polygon>
+                <animateTransform attributeName="transform" type="scale" dur="4s" repeatCount="indefinite"
+                    keyTimes="0; 0.5; 1" values="1;5;1" />
+            </g>
+            <g id="starB">
+                <polygon  class="star" fill="#F8F65F" stroke="#F7BA3F"
+                    style="transform: translate(150px, 0px)"
+                    points="82.99,23.438 69.055,66.212 24.069,66.247 60.443,92.716 46.575,135.511 82.99,109.098 119.405,135.511 105.537,92.716 141.91,66.247 96.924,66.211 ">
+                </polygon>
+                <animateTransform attributeName="transform" begin="0s" dur="5s" type="rotate" from="0 235 83"
+                    to="360 235 83" repeatCount="indefinite" />
+            </g>
+
+            <g id="starC">
+                <polygon  class="star" fill="#F8F65F" stroke="#F7BA3F"
+                    style="transform: translate(300px, 0px)"
+                    points="82.99,23.438 69.055,66.212 24.069,66.247 60.443,92.716 46.575,135.511 82.99,109.098 119.405,135.511 105.537,92.716 141.91,66.247 96.924,66.211 ">
+                </polygon>
+                <animateTransform attributeName="transform" type="translate" dur="4s" repeatCount="indefinite"
+                    keyTimes="0; 0.2; 0.4; 0.6; 1" values="0 0; 200 0; 200 200; 200 0; 0 0" />
+            </g>
+        </svg>
+    </div>
+</body>
+
+</html>

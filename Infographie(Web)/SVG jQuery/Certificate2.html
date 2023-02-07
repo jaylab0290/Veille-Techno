@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        #title {
+            stroke: blue;
+            fill: green;
+            stroke-width: 3px;
+            font-size: 11em;
+        }
+
+        .bodyBackGround {
+            background-image: url(Frame213.svg);
+            background-repeat: no-repeat;
+            background-size: 1600px;
+        }
+
+        .titleContainer {
+            width: 1200px;
+            height: 600px;
+        }
+
+        .eyesback {
+            fill: red
+        }
+
+        .eyes {
+            fill: blue;
+        }
+
+        .face {
+            fill: orange;
+        }
+
+        .mouth {
+            fill: yellow;
+        }
+    </style>
+</head>
+
+<body class="bodyBackGround">
+    <!-- inline SVG -->
+    <svg id="frame" class="titleContainer">
+        <text id="title" x="310" y="500"> text to be change by JavaScript </text>
+    </svg>
+
+    <div style="margin-left:310px">
+        <h1 style="color:blue;">
+            Vous avez réussi avec succès votre entraînement!
+        </h1>
+        <svg width="100" height="100" viewBox="0 0 5600 5635">
+            <use href="#Smiley"></use>
+        </svg>
+        <svg width="200" height="200" viewBox="0 0 5600 5635">
+            <use href="#Smiley"></use>
+        </svg>
+        <svg width="300" height="300" viewBox="0 0 5600 5635">
+            <use href="#Smiley"></use>
+        </svg>
+        <br>
+        <!-- External reference to a SVG file -->
+        <img src="smiley.svg" style="width:400px">
+    </div>
+
+    <!-- inline SVG -->
+    <svg>
+        <symbol id="Smiley">
+            <ellipse class="face" fill="#FAC93F" stroke="#7E7F17" cx="2800.5" cy="2817.312" rx="2800" ry="2816.812" />
+            <ellipse class="eyesback" fill="#FFFFFF" stroke="#7E7F17" cx="1833.662" cy="1767.628" rx="531.282" ry="534.472" />
+            <ellipse class="eyesback" fill="#FFFFFF" stroke="#7E7F17" cx="3719.476" cy="1767.628" rx="531.282" ry="534.472" />
+            <ellipse class="eyes" stroke="#7E7F17" cx="3614.176" cy="1825.409" rx="387.692" ry="390.021" />
+            <ellipse class="eyes" stroke="#7E7F17" cx="1737.937" cy="1825.409" rx="387.692" ry="390.021" />
+            <path class="mouth" fill="#FFFFFF" stroke="#7E7F17" d="M4518.791,3818.847c0,582.382-962.552,480.535-1718.29,1054.496 C2062.5,5433.833,1082.21,4401.229,1082.21,3818.847" />
+        </symbol>
+    </svg>
+
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => { init_UI(); });
+    function init_UI() {
+        let title = document.getElementById("title");
+        title.innerHTML = "Certificat";
+    }
+</script>
+
+</html>

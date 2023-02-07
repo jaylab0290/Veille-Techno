@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        rect:hover {
+            fill: chocolate;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Ventes 2020</h1>
+    <div id="graphContainer" style="border:1px solid red; width:800px; height:800px"></div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => { init_UI(); });
+    const svgns = "http://www.w3.org/2000/svg";
+    let viewPortMaxUnitX = 1000;
+    let viewPortMaxUnitY = 1000;
+    let mois = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    let ventes = [6500, 5550, 4000, 4500, 2500, 1500, 500, 1000, 1500, 2000, 4000, 3500];
+    let viewport = null;
+    function init_UI() {
+        insertViewPort("graphContainer");
+        drawBars();
+    }
+    function insertViewPort(containerId) {
+        viewport = document.createElementNS(svgns, "svg");
+        viewport.setAttribute("id", "viewport");
+        viewport.setAttribute("viewBox", "0 0 " + viewPortMaxUnitX + " " + viewPortMaxUnitY);
+        document.getElementById(containerId).appendChild(viewport);
+    }
+    function line(x1, y1, x2, y2, stroke = "black", strokeWidth = 1) {
+        let line = document.createElementNS(svgns, "line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", toScreen(y1));
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", toScreen(y2));
+        line.setAttribute("stroke", stroke);
+        line.setAttribute("stroke-width", strokeWidth);
+        return line;
+    }
+    function rect(x, y, width, height, fill = "white", stroke = "black", strokeWidth = 1) {
+        let rect = document.createElementNS(svgns, "rect");
+        rect.setAttribute("x", x);
+        rect.setAttribute("y", toScreen(y) - height);
+        rect.setAttribute("width", width);
+        rect.setAttribute("height", height);
+        rect.setAttribute("fill", fill);
+        rect.setAttribute("stroke", stroke);
+        rect.setAttribute("stroke-width", strokeWidth);
+        return rect;
+    }
+    function text(x, y, content, angle = 0, size = "1", family = "serif", style = "normal") {
+        let text = document.createElementNS(svgns, "text");
+        text.setAttribute("x", x);
+        text.setAttribute("y", toScreen(y));
+        text.setAttribute("transform", "rotate(" + angle + "," + x + "," + toScreen(y) + ")");
+        text.setAttribute("font-size", size + "em");
+        text.setAttribute("font-family", family);
+        text.setAttribute("style", style);
+        text.innerHTML = content;
+        return text;
+    }
+    function toScreen(y) {
+        return viewPortMaxUnitY - y;
+    }
+    function drawBars() {
+        let fill = "yellow";
+        let stroke = "red";
+        let graphMarginX = 150;
+        let graphMarginY = 200;
+        let ox = graphMarginX;
+        let oy = graphMarginY;
+        let barMargin = 5;
+        let barWidth = (viewPortMaxUnitX - 2 * graphMarginX) / ventes.length - 2 * barMargin;
+        let barPos = ox + barMargin;
+
+        for (let y = 0; y < 8000; y += 1000) {
+            viewport.appendChild(line(ox - 10, oy + y / 10, viewPortMaxUnitX - graphMarginX + 10, oy + y / 10, "gray"));
+            let label = text(ox - 20, oy + y / 10 - 10, "$ " + y, 0, 2);
+            label.setAttribute("text-anchor", "end");
+            viewport.appendChild(label);
+        }
+        for (let b = 0; b < ventes.length; b++) {
+            viewport.appendChild(rect(barPos, oy, barWidth, ventes[b] / 10, "yellow", "orange", 1));
+            viewport.appendChild(text(barPos + barWidth / 2, oy - 30, mois[b], 45, 2));
+            barPos += barWidth + 2 * barMargin;
+        }
+
+    }
+</script>
+
+</html>

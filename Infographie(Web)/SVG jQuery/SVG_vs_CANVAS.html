@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        #graphContainer,
+        #drawingContext {
+            border: 0.01px solid blue;
+            width: 180px;
+            height: 180px;
+            margin:0px;
+            float:left;
+        }
+    </style>
+
+</head>
+
+<body>
+    <h1>SVG VS CANVAS</h1>
+    <div id="beziersDemoContainer">
+        <div id="graphContainer"></div>
+        <canvas id="drawingContext" ></canvas>
+    </div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => { init_UI(); });
+    const svgns = "http://www.w3.org/2000/svg";
+    let viewPortMaxUnit = 5000;
+    let lineWidth = 5;
+    let step = viewPortMaxUnit / 50;
+    let viewport = null;
+    function init_UI() {
+        insertViewPort("graphContainer");
+        InserSVGBezierLines();
+        setCanvasViewPort("drawingContext");
+        DrawBezierLinesIntoCanvas();
+    }
+    function insertViewPort(containerId) {
+        viewport = document.createElementNS(svgns, "svg");
+        viewport.setAttribute("id", "viewport");
+        viewport.setAttribute("viewBox", "0 0 " + viewPortMaxUnit + " " + viewPortMaxUnit);
+        document.getElementById(containerId).appendChild(viewport);
+    }
+
+    function setCanvasViewPort(canvasId){
+        let canvas = document.getElementById(canvasId);
+        canvas.width = viewPortMaxUnit;
+        canvas.height = viewPortMaxUnit;
+    }
+    function InsertSVGLine(x1, y1, x2, y2, stroke = "black", strokeWidth = 1) {
+        let line = document.createElementNS(svgns, "line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", y2);
+        line.setAttribute("stroke", stroke);
+        line.setAttribute("stroke-width", strokeWidth);
+        return line;
+    }
+
+    function InserSVGBezierLines() {
+        for (let x = 0; x <= viewPortMaxUnit; x += step) {
+            viewport.appendChild(InsertSVGLine(x, 0, viewPortMaxUnit, x, "black", lineWidth));
+        }
+    }
+
+    function DrawLine(DC, x1, y1, x2, y2, color = "black", lineWidth = 1) {
+        DC.strokeStyle = color;
+        DC.lineWidth = lineWidth;
+        DC.moveTo(x1, y1);
+        DC.lineTo(x2, y2);
+        DC.stroke();
+    }
+
+    function DrawBezierLinesIntoCanvas() {
+        let canvas = document.getElementById("drawingContext");
+        let DC = canvas.getContext('2d');
+        console.log(canvas.width)
+        for (let x = 0; x <= canvas.width; x += step) {
+            DrawLine(DC, 0, x, canvas.width - x, 0, "black", lineWidth);
+        }
+    }
+</script>
+
+</html>

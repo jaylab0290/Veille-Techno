@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <style>
+            .draggable {
+                cursor: grab;
+            }
+
+            #svgCanvas {
+                border: 5px solid rgb(25, 0, 255);
+                cursor: crosshair;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            #canvasContainer {
+                overflow: scroll;
+                width: 1000px;
+                height: 1000px;
+                border: 1px solid rgb(0, 0, 0);
+            }
+
+            .handlesLink {
+                stroke: black;
+                stroke-width: 1;
+            }
+
+            .handle {
+                stroke: black;
+                fill: white;
+            }
+
+            .closingAnchor {
+                display: none !important;
+            }
+
+            .hidden {
+                display: none;
+            }
+
+            path {
+                fill: white;
+                stroke: black;
+            }
+        </style>
+
+    </head>
+
+    <body>
+        <div id="canvasContainer" width="1000px" height="1000px">
+            <svg id="svgCanvas" width="1000px" height="1000px" viewbox="0 0 1000 1000">
+                <g id="svgGroup" class="draggable"></g>
+            </svg>
+        </div>
+        <script defer>
+            const svgns = "http://www.w3.org/2000/svg";
+            const handleSize = 10;
+            let currentPathId = 0;
+
+            document.addEventListener('DOMContentLoaded', () => {
+                svgViewport = document.getElementById("svgCanvas");
+                svgViewport.addEventListener("pointerdown", mouseDown);
+                svgViewport.addEventListener("pointermove", mouseMove);
+                svgViewport.addEventListener("pointerup", mouseUp);
+                document.addEventListener("keydown", keydown);
+                document.addEventListener("keyup", keyup);
+            });
+
+            function addSVG(svgObject) {
+                document.getElementById("svgGroup").appendChild(svgObject);
+            }
+            function newPathId() {
+                return currentPathId++;
+            }
+            class Anchor {
+                constructor(pathId, index, pos, control) {
+                    this.pathId = pathId;
+                    this.index = index;
+                    this.pos = pos;
+                    this.control = control;
+                    this.controlActive = true;
+                    this.addHandles();
+                    this.toggleControlActivation();
+                    this.update();
+                    this.addMouseDownEventToHandles();
+                }
+                toggleControlActivation() {
+                    if (this.controlActive) {
+                        this.control = { ...this.pos };
+                        this.controlHandle.classList.add('hidden');
+                        this.handlesLink.classList.add('hidden');
+                    }
+                    else {
+                        this.controlHandle.classList.remove('hidden');
+                        this.handlesLink.classList.remove('hidden');
+                    }
+                    this.controlActive = !this.controlActive;
+                    this.update();
+                }
+                addMouseDownEventToHandles() {
+                    this.anchorHandle.addEventListener("pointerdown", handleMouseDown);
+                    this.controlHandle.addEventListener("pointerdown", handleMouseDown);
+                }
+                addHandles() {
+                    this.addLink();
+                    this.addAnchor();
+                    this.addControl();
+                    this.update();
+                }
+                addLink() {
+                    this.handlesLink = document.createElementNS(svgns, "line");
+                    this.handlesLink.setAttribute("pathId", this.pathId);
+                    this.handlesLink.classList.add("handlesLink");
+                    addSVG(this.handlesLink);
+                }
+                addAnchor() {
+                    this.anchorHandle = document.createElementNS(svgns, "rect");
+                    this.anchorHandle.setAttribute("width", handleSize);
+                    this.anchorHandle.setAttribute("height", handleSize);
+                    this.anchorHandle.setAttribute("pathId", this.pathId);
+                    this.anchorHandle.setAttribute("index", this.index);
+                    this.anchorHandle.setAttribute("type", 'anchor');
+                    this.anchorHandle.classList.add("handle");
+                    addSVG(this.anchorHandle);
+                }
+                addControl() {
+                    this.controlHandle = document.createElementNS(svgns, "ellipse");
+                    this.controlHandle.setAttribute("rx", handleSize / 2);
+                    this.controlHandle.setAttribute("ry", handleSize / 2);
+                    this.controlHandle.setAttribute("pathId", this.pathId);
+                    this.controlHandle.setAttribute("index", this.index);
+                    this.controlHandle.setAttribute("type", 'control');
+                    this.controlHandle.classList.add("handle");
+                    addSVG(this.controlHandle);
+                }
+                update() {
+                    this.updateAnchor();
+                    this.updateControl();
+                    this.updateLink();
+                }
+                updateLink() {
+                    this.handlesLink.setAttribute("x1", this.pos.x);
+                    this.handlesLink.setAttribute("y1", this.pos.y);
+                    this.handlesLink.setAttribute("x2", this.control.x);
+                    this.handlesLink.setAttribute("y2", this.control.y);
+                }
+                updateAnchor(anchor, pos) {
+                    this.anchorHandle.setAttribute("x", this.pos.x - handleSize / 2);
+                    this.anchorHandle.setAttribute("y", this.pos.y - handleSize / 2);
+                }
+                updateControl() {
+                    this.controlHandle.setAttribute("cx", this.control.x);
+                    this.controlHandle.setAttribute("cy", this.control.y);
+                }
+                moveAnchor(deltax, deltay) {
+                    this.pos.x += deltax;
+                    this.pos.y += deltay;
+                    this.update();
+                }
+                moveControl(deltax, deltay) {
+                    this.control.x += deltax;
+                    this.control.y += deltay;
+                    this.update();
+                }
+                setClosingPath() {
+                    this.anchorHandle.classList.add("closingAnchor");
+                }
+            }
+
+
+            class Path {
+                constructor() {
+                    this.id = newPathId();
+                    this.anchors = [];
+                    this.selected = true;
+                    this.closed = false;
+                    this.initNode();
+                }
+                initNode() {
+                    this.svgNode = document.createElementNS(svgns, "path");
+                    this.svgNode.setAttribute("pathId", this.id);
+                    addSVG(this.svgNode);
+                }
+                addAnchor(x, y) {
+                    let pos = { x, y }
+                    if (this.anchors.length == 0) {
+                        this.anchors.push(new Anchor(this.id, this.anchors.length, { ...pos }, { ...pos }));
+                    } else {
+                        let endAnchor = new Anchor(this.id, this.anchors.length, { ...pos }, { ...pos });
+
+                        this.anchors.push(endAnchor);
+
+                        if (this.closed && ((endAnchor.pos.x == this.anchors[0].pos.x) && (endAnchor.pos.y == this.anchors[0].pos.y))) {
+                            endAnchor.setClosingPath();
+                        } else {
+                            let startAnchor = new Anchor(this.id, this.anchors.length, { ...pos }, { ...pos });
+                            this.anchors.push(startAnchor);
+                        }
+                    }
+                    this.update();
+                }
+                anchorData(anchor) {
+                    let anchorData = "";
+                    if (anchor.index == 0) {
+                        anchorData = `M ${anchor.pos.x}, ${anchor.pos.y}`;
+                    } else {
+                        let prevAnchor = this.anchors[anchor.index - 1];
+                        if ((prevAnchor.pos.x != anchor.pos.x) || (prevAnchor.pos.y != anchor.pos.y))
+                            anchorData += ` C ${prevAnchor.control.x},${prevAnchor.control.y} ${anchor.control.x},${anchor.control.y} ${anchor.pos.x},${anchor.pos.y}`;
+                    }
+                    return anchorData;
+                }
+                update() {
+                    let pathData = "";
+                    for (let anchor of this.anchors) {
+                        pathData += this.anchorData(anchor);
+                    }
+                    this.svgNode.setAttribute("d", pathData);
+                }
+                toggleControl(handle) {
+                    if (handle.type == 'anchor') {
+                        let anchor = this.anchors[handle.index];
+                        if (anchor.index > 0) {
+                            let prevAnchor = this.anchors[anchor.index - 1];
+                            if (anchor.controlActive && prevAnchor.controlActive) {
+                                anchor.toggleControlActivation();
+                            } else {
+                                if (!anchor.controlActive && prevAnchor.controlActive) {
+                                    prevAnchor.toggleControlActivation();
+                                } else {
+                                    if (!anchor.controlActive && !prevAnchor.controlActive) {
+                                        anchor.toggleControlActivation();
+                                    } else {
+                                        prevAnchor.toggleControlActivation();
+                                        prevAnchor.control.x = prevAnchor.control.x - (anchor.control.x - anchor.pos.x);
+                                        prevAnchor.control.y = prevAnchor.control.y - (anchor.control.y - anchor.pos.y);
+                                        prevAnchor.update();
+                                    }
+                                }
+                            }
+                        } else {
+                            anchor.toggleControlActivation();
+                        }
+                    }
+                    this.update();
+                }
+                broken(c1, a, c2) {
+                    let dx = Math.abs((c1.x - a.x) - (a.x - c2.x));
+                    let dy = Math.abs((c1.y - a.y) - (a.y - c2.y));
+                    let broked = (dx + dy) > 5;
+                    //console.log('broken', broked, dx, dy, c1, a, c2);
+                    return broked;
+                }
+                moveHandle(handle, deltax, deltay, ctrl = false) {
+                    let anchor = this.anchors[handle.index];
+                    switch (handle.type) {
+                        case 'anchor':
+                            anchor.moveAnchor(deltax, deltay);
+                            anchor.moveControl(deltax, deltay);
+                            if (anchor.index > 0) {
+                                let prevAnchor = this.anchors[anchor.index - 1];
+                                prevAnchor.moveAnchor(deltax, deltay);
+                                prevAnchor.moveControl(deltax, deltay);
+                            } else {
+                                if (this.closed) {
+                                    this.anchors[this.anchors.length - 1].moveAnchor(deltax, deltay);
+                                    this.anchors[this.anchors.length - 1].moveControl(deltax, deltay);
+                                }
+                            }
+                            break;
+                        case 'control':
+                            let control = { ...anchor.control };
+                            anchor.moveControl(deltax, deltay);
+                            if (!ctrl) {
+                                let twin = null;
+                                if (anchor.index > 0) {
+                                    let prevAnchor = this.anchors[anchor.index - 1];
+                                    if ((prevAnchor.pos.x == anchor.pos.x) && (prevAnchor.pos.y == anchor.pos.y))
+                                        twin = prevAnchor;
+                                }
+                                let length = this.anchors.length;
+                                if ((anchor.index + 1) < this.anchors.length) {
+                                    let nextAnchor = this.anchors[anchor.index + 1];
+                                    if ((nextAnchor.pos.x == anchor.pos.x) && (nextAnchor.pos.y == anchor.pos.y))
+                                        twin = nextAnchor;
+                                }
+
+                                if (anchor.index == (this.anchors.length - 1)) {
+                                    twin = this.anchors[0];
+                                }
+
+                                if (twin && twin.controlActive) {
+                                    if (!this.broken(twin.control, anchor.pos, control))
+                                        twin.moveControl(-deltax, -deltay);
+                                }
+                            }
+                            break;
+                        default: break;
+                    }
+                    this.update();
+                }
+            }
+            let paths = [];
+            function makePath() {
+                let path = new Path();
+                path.closed = true;
+                paths.push(path);
+                path.addAnchor(100, 100);
+                path.addAnchor(500, 100);
+                path.addAnchor(500, 500);
+                path.addAnchor(100, 500);
+                path.addAnchor(100, 100);
+            }
+
+            makePath();
+
+            function keydown(e) {
+                let ev = e || window.event;
+                let key = e.which || e.keyCode; //
+
+                if (key == 8 || key == 46) { // delete selected
+                    const svgObjects = document.querySelectorAll('.selected');
+                    for (let object of svgObjects) {
+                        object.remove();
+                    }
+                } else {
+                    let ctrl = e.ctrlKey ? e.ctrlKey : ((key === 17) ? true : false)
+                    if (ctrl && key == 65) { // select all
+                        const svgViewport = document.querySelectorAll(' to do');
+                        for (let object of svgViewport) {
+                            object.classList.add('selected');
+                        }
+                    }
+                }
+            }
+            function keyup(e) {
+                var key = e.keyCode || e.charCode;
+                controlDown = false;
+            }
+
+            let currentPath = null;
+            let currentPathHandle = null;
+
+            function handleMouseDown(e) {
+                console.log('handle mouse down')
+                mouseDownPos = { x: e.offsetX, y: e.offsetY };
+                handle = e.target;
+                let pathIndex = parseInt(handle.getAttribute('pathId'));
+                console.log(pathIndex);
+                currentPath = paths[pathIndex];
+                currentPathHandle = {
+                    index: parseInt(handle.getAttribute('index')),
+                    type: handle.getAttribute('type'),
+                }
+                console.log(currentPathHandle);
+                if (e.ctrlKey) currentPath.toggleControl(currentPathHandle);
+            }
+
+            let lastMousePos;
+            function mouseDown(e) {
+                console.log('panel mouse down')
+                mouseDownPos = { x: e.offsetX, y: e.offsetY };
+                currentTarget = e.target;
+                currentTarget.setPointerCapture(e.pointerId);
+                currentTarget.style.cursor = 'crosshair';
+                lastMousePos = mouseDownPos;
+            }
+
+            function mouseMove(e) {
+                if (currentPath) {
+                    let d = { x: e.offsetX - lastMousePos.x, y: e.offsetY - lastMousePos.y };
+                    currentPath.moveHandle(currentPathHandle, d.x, d.y, e.ctrlKey)
+                    lastMousePos = { x: e.offsetX, y: e.offsetY }
+                }
+            }
+            function mouseUp(e) {
+                if (currentPath) {
+                    currentTarget.releasePointerCapture(e.pointerId);
+                    currentTarget.style.cursor = 'move';
+                }
+                currentTarget = null;
+                currentPath = null;
+                currentPath = null;
+            }
+        </script>
+    </body>
+
+</html>

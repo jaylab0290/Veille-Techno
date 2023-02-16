@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+
+<body>
+    <label for="ville">Ville</label>
+    <input type="text" id="ville">
+    <input type="submit" id="confirmVille" onclick="ChangeTown()" value="Prévisions">
+    <div id="graphContainer" style="margin:auto;"></div>
+</body>
+<script src="jquery/jquery-3.4.1.min.js"></script>
+<script defer>
+    /*La clé de OpenWeather = 1501df0e74b16e368988fc0957903d54*/
+    let apiKey = "1501df0e74b16e368988fc0957903d54";
+    let container = document.getElementById("graphContainer");
+    let ville = "Boisbriand";
+    let data = null;
+    let weather = [];
+    google.charts.load('current', { packages: ['corechart'], language: 'En' });
+    google.charts.setOnLoadCallback(DrawChart);
+
+    function SetData() {
+        let informations = [];
+        if (weather.length == 0) {
+            ChangeTown();
+        }
+        weather.forEach(element => {
+            informations.push([element["dt_txt"], element["main"]["temp_max"], element["main"]["temp_min"]])
+        });
+        data = new google.visualization.DataTable();
+        data.addColumn('string', 'date');
+        data.addColumn('number', 'Maximum');
+        data.addColumn('number', 'Minimum');
+        data.addRows(informations);
+        DrawChart(informations);
+    }
+
+    function DrawChart() {
+        if(document.getElementById("ville").value != null){
+            ville = document.getElementById("ville").value
+        }
+        var options = {
+            title: ville + " - Prévisions pour 7 jours",
+            titleTextStyle: { fontSize: '32', color: 'green' },
+            series: { 0: { color: 'cyan' } }
+        };
+
+        if (data == null)
+            SetData()
+        var chart = new google.visualization.LineChart(document.getElementById("graphContainer"))
+        chart.draw(data, options);
+    }
+
+    function ChangeTown() {
+        //ville = document.getElementById("ville").value;
+        if (document.getElementById("ville").value != "") 
+        { 
+            ville = document.getElementById("ville").value;
+        }
+
+        let url = `https://api.openweathermap.org/data/2.5/forecast?units=metric&q=` + ville + "&appid=" + apiKey;
+
+        $.ajax({
+            url: url,
+            success: (result) => {
+                weather = result.list;
+                SetData();
+            },
+            error: (errorThrown) => {
+                console.log(errorThrown);
+            }
+        });
+    }
+</script>
+
+</html>
